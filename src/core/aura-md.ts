@@ -54,6 +54,17 @@ export async function loadAuraMarkdown(cwd = process.cwd()): Promise<AuraDocumen
   return parseAuraMarkdown(raw);
 }
 
+/**
+ * Parses `aura.md` into a flat section list while preserving enough source
+ * location data to surgically replace managed blocks later.
+ *
+ * Rules:
+ * - `#` headings are ignored
+ * - `##+` headings become sections
+ * - parentage is inferred from heading depth using a nearest-parent stack
+ * - each section's "prelude" is everything between its heading line and the
+ *   next heading, which is where description text and managed blocks live
+ */
 export function parseAuraMarkdown(raw: string): AuraDocument {
   const headings = matchHeadings(raw);
   const sections: AuraSection[] = [];
@@ -112,6 +123,15 @@ export function summarizeAnnotation(annotation?: string): AnnotationSummary {
   };
 }
 
+/**
+ * Replaces only Aura-managed fenced blocks inside a section and leaves the rest
+ * of the markdown byte-for-byte untouched.
+ *
+ * Existing `annotation` and `metadata` blocks are merged with the incoming
+ * values so callers can update one block without rebuilding the other. When a
+ * section has no managed blocks yet, new blocks are inserted into the section's
+ * prelude instead of reserializing the whole document.
+ */
 export function upsertManagedBlocks(
   document: AuraDocument,
   sectionSlug: string,
@@ -202,6 +222,14 @@ function stripManagedBlocks(prelude: string): string {
   return prelude.replace(MANAGED_BLOCK_REGEX, "").trim();
 }
 
+/**
+ * Counts top-level list items under a supported annotation key using
+ * indentation, not full YAML parsing.
+ *
+ * This is intentionally lightweight because Aura only needs summary counts for
+ * CLI output. Nested list items are treated as part of the current entry rather
+ * than separate items.
+ */
 function countListEntries(
   source: string | undefined,
   key: "tools" | "endpoints" | "subagents",

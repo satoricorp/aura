@@ -5,6 +5,13 @@ export interface AuraUpdate {
   latestVersion: string;
 }
 
+/**
+ * Checks npm for a newer Aura version without ever blocking the CLI.
+ *
+ * The check is skipped when `AURA_NO_UPDATES=1`, when the local package looks
+ * unpublished (`0.0.0`), or when any network or parsing step fails. A short
+ * timeout keeps this best-effort warning path from slowing down normal usage.
+ */
 export async function checkForAuraUpdates(): Promise<AuraUpdate | null> {
   if (process.env.AURA_NO_UPDATES === "1") {
     return null;

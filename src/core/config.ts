@@ -49,6 +49,13 @@ export function createConfig(input: AuraConfigInput = {}): AuraConfig {
 
 export const config = createConfig;
 
+/**
+ * Loads `aura.config.ts` when present and falls back to the documented default
+ * config when it is missing.
+ *
+ * The dynamic import includes a timestamp query so repeated CLI runs pick up
+ * local edits instead of reusing a cached module instance.
+ */
 export async function loadConfig(cwd = process.cwd()): Promise<LoadedConfig> {
   const { configFile } = resolveProjectPaths(cwd);
   if (!(await pathExists(configFile))) {

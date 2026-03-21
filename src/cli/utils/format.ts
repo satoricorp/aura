@@ -16,6 +16,13 @@ export function formatHelp(): string {
   ].join("\n");
 }
 
+/**
+ * Renders the current `aura.md` section tree as a human-scannable CLI summary.
+ *
+ * Top-level orchestrators are listed first, then nested sections are rendered
+ * as a tree. Counts come from annotation summaries when present, with child
+ * sections used as the fallback signal for subagent display.
+ */
 export function formatAgentList(document: AuraDocument): string {
   const roots = getRootSections(document);
   if (roots.length === 0) {

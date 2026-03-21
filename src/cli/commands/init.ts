@@ -26,6 +26,12 @@ export interface InitResult {
   skipped: string[];
 }
 
+/**
+ * Creates Aura's starter files without overwriting user-owned content.
+ *
+ * This command is intentionally idempotent so users can rerun `aura init`
+ * safely in an existing project and only fill in files that are still missing.
+ */
 export async function scaffoldAuraProject(cwd = process.cwd()): Promise<InitResult> {
   const { auraFile, configFile } = resolveProjectPaths(cwd);
   const created: string[] = [];
