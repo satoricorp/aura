@@ -35,5 +35,7 @@ describe("scaffoldAuraProject", () => {
 
     expect(auraMarkdown).toContain("## Example Agent");
     expect(auraConfig).toContain('import { config } from "aura";');
+    expect(auraConfig).toContain('provider: "openai"');
+    expect(auraConfig).toContain('model: "gpt-5.2"');
   });
 });

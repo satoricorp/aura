@@ -19,7 +19,7 @@ subagents:
 \`\`\`
 
 \`\`\`metadata
-model: claude-sonnet-4-5
+model: gpt-5.2
 \`\`\`
 
 ### Billing Agent
@@ -58,7 +58,7 @@ Handles billing questions.
 endpoints:
   - method: POST
     path: /chat`,
-      metadata: `model: claude-sonnet-4-5`,
+      metadata: `model: gpt-5.2`,
     });
 
     expect(updated).toContain("<!-- keep me exactly -->");

@@ -13,8 +13,8 @@ const DEFAULT_AURA_CONFIG = `import { config } from "aura";
 
 export default config({
   model: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-5",
+    provider: "openai",
+    model: "gpt-5.2",
   },
   outDir: "dist",
   maxSteps: 5,

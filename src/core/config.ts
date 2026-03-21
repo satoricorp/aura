@@ -29,8 +29,8 @@ export interface LoadedConfig {
 
 export const DEFAULT_CONFIG = Object.freeze({
   model: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-5",
+    provider: "openai",
+    model: "gpt-5.2",
   },
   outDir: "dist",
   maxSteps: 5,
