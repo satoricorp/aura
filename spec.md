@@ -4,7 +4,7 @@
 
 ## Overview
 
-`aura` is an npm-published CLI that reads a markdown file, and builds each agent found in the markdown file as code output in the `/src/agents` directory.
+`aura` is an npm-published CLI that reads `aura.md`, generates reviewable TypeScript source for each agent into `/src/agents`, and uses a build step to compile deployable artifacts into `/dist`.
 
 Each agent exposes an API, CLI, Skill, and MCP. The output is business logic you can change and save via git. Our goal is to increase determinism, with instructions to build things with specific libraries to make it more predictable.
 
@@ -28,10 +28,12 @@ On every command, `aura` checks the npm registry for a newer version and warns i
 ## Open Source vs Paid Split
 
 **Open source**
+
 - `aura generate` and everything it produces
-- `src/agents` artifacts are fully self-contained, no Satorico infrastructure required
+- `src/agents` source and compiled `dist` artifacts are fully self-contained, no Satorico infrastructure required
 
 **Paid**
+
 - `aura deploy` and all subcommands
 - @satorico handles code.storage push, npm publish for CLI, live URL
 
@@ -45,29 +47,33 @@ A plain markdown file at the project root. Each level-2 heading (`##`) defines a
 # Aura Agents
 
 ## Support Bot
+
 Handles customer support for a SaaS product. Helps users troubleshoot billing
 issues, understand features, and routes complex cases to the right place.
 Should be empathetic and concise.
 
 ### Billing Agent
+
 Specializes in billing questions, subscription changes, and payment failures.
 
 ### FAQ Agent
+
 Answers common product questions. If it doesn't know, it escalates rather than guessing.
 
 ## Code Reviewer
+
 Reviews pull request diffs and provides feedback on code quality and security.
 Direct, specific, no vague feedback. Focused on TypeScript codebases.
 ```
 
 ### Heading Hierarchy
 
-| Level | Role |
-|---|---|
-| `#` | File title — ignored |
-| `##` | Orchestrator — gets its own `dist/<id>/` with all four surfaces |
-| `###` | Subagent — owned by nearest `##` parent, generated as a module in `dist/<id>/subagents/` |
-| `####`+ | Sub-subagent — owned by nearest `###` parent |
+| Level   | Role                                                                                           |
+| ------- | ---------------------------------------------------------------------------------------------- |
+| `#`     | File title — ignored                                                                           |
+| `##`    | Orchestrator — gets its own `src/agents/<id>/` source tree, later compiled to `dist/<id>/`     |
+| `###`   | Subagent — owned by nearest `##` parent, generated as a module in `src/agents/<id>/subagents/` |
+| `####`+ | Sub-subagent — owned by nearest `###` parent                                                   |
 
 Subagents are not independently deployable in v0.1. They are TypeScript modules called by their orchestrator. Only orchestrators get the four public surfaces.
 
@@ -78,19 +84,20 @@ Subagents are not independently deployable in v0.1. They are TypeScript modules 
 Created by `aura init`. Keep this super simple.
 
 ```typescript
-import { config } from 'aura';
+import { config } from "aura";
 
 export default config({
   model: {
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    provider: "anthropic",
+    model: "claude-sonnet-4-5",
   },
-  outDir: 'dist',
+  outDir: "dist",
   maxSteps: 5,
 });
 ```
 
 `maxSteps` controls how many tool-use iterations generated agents allow before stopping. Default: `5`. Applied globally — not configurable per-agent in v0.1.
+`outDir` controls where `aura build` writes compiled artifacts. `aura generate` always writes reviewable source to `src/agents/`.
 
 ---
 
@@ -100,6 +107,7 @@ After extraction, `aura generate` command writes `annotation` and `metadata` blo
 
 ````markdown
 ## Support Bot
+
 Handles customer support for a SaaS product.
 
 ```annotation
@@ -153,6 +161,7 @@ Not included by default. If the agent requires web search, the user can confirm 
 ```
 ◆ Support Bot proposes web search (exa_search). Include it? › Yes / No
 ```
+
 If the user stays 'Yes', then the CLI prompts for the EXA_API_KEY, and writes it to .env in root. If there is no .env, show error, note the user needs to add the API key in their environment variables under EXA_API_KEY, and continue.
 
 ---
@@ -198,14 +207,14 @@ $ aura generate
 After Enter, `aura` re-reads `aura.md` and uses whatever is in the annotation blocks at that moment. A final confirmation is shown before writing any files:
 
 ```
-  ⚠ dist/support-bot/ already exists and will be overwritten. Run `aura generate support-bot` to only generate logic for single agents.
-  ⚠ dist/code-reviewer/ already exists and will be overwritten. Run `aura generate code-reviewer` to only generate logic for single agents.
+  ⚠ src/agents/support-bot/ already exists and will be overwritten. Run `aura generate support-bot` to only generate logic for a single agent.
+  ⚠ src/agents/code-reviewer/ already exists and will be overwritten. Run `aura generate code-reviewer` to only generate logic for a single agent.
 
 
   support-bot     2 endpoints · 3 tools · 2 subagents   [API, MCP, CLI, Skill]
   code-reviewer   1 endpoint  · 0 tools · 0 subagents   [API, MCP, Skill]
 
-  Output: dist/
+  Output: src/agents/
   Files:  18 new
 
 ◆ Confirm? › Yes / No
@@ -215,12 +224,13 @@ The overwrite warning only appears for agents whose output directory already exi
 
 ---
 
-## Generated Output Structure
+## Generated Source and Build Structure
 
-`dist/<agent>/{api,mcp,cli,SKILL.md}` is a stable public contract. Don't restructure it.
+`src/agents/<agent>/{api,mcp,cli,SKILL.md}` is the reviewable source contract.
+`aura build` compiles the matching deployable artifact structure into `dist/<agent>/`. Don't restructure either layout.
 
 ```
-dist/
+src/agents/
   <agent-name>/
     agent.ts            ← core logic, shared by all surfaces
     subagents/
@@ -238,7 +248,26 @@ dist/
     SKILL.md            ← generated skill definition
 ```
 
-`src/agents/` is the only thing users touch. `dist/` is generated output — optionally committed, optionally gitignored depending on their CI setup.
+```
+dist/
+  <agent-name>/
+    agent.js
+    subagents/
+      billing-agent.js
+      faq-agent.js
+    api/
+      index.js
+      package.json
+    mcp/
+      index.js
+      package.json
+    cli/
+      index.js
+      package.json
+    SKILL.md
+```
+
+`src/agents/` is the reviewable source tree users touch. `dist/` is compiled output for deployment or publishing.
 
 ---
 
@@ -246,23 +275,23 @@ dist/
 
 Each surface has its own `package.json` so it can be deployed or published independently. The number of endpoints, MCP tools, and CLI commands is inferred from the annotation — not a fixed template. There should be a mechanism to determine what endpoints and tools to create and expose, which is handled by the HITL approval step.
 
-### 1. API (`dist/<agent>/api/`)
+### 1. API (`src/agents/<agent>/api/`)
 
-Hono server. One route per endpoint in the annotation.
+Hono server source. One route per endpoint in the annotation. `aura build` compiles it to `dist/<agent>/api/`.
 
-### 2. MCP (`dist/<agent>/mcp/`)
+### 2. MCP (`src/agents/<agent>/mcp/`)
 
-Hono + `@hono/mcp`. Streamable HTTP transport only, no stdio. Tools are inferred from the annotation.
+Hono + `@hono/mcp`. Streamable HTTP transport only, no stdio. Tools are inferred from the annotation. `aura build` compiles it to `dist/<agent>/mcp/`.
 
-### 3. CLI (`dist/<agent>/cli/`)
+### 3. CLI (`src/agents/<agent>/cli/`)
 
-Standalone npm package published under `@satorico/<agent-name>`. Commands inferred from the annotation's endpoints. `chat` command is always present. Uses Clack.
+Standalone npm package published under `@satorico/<agent-name>`. Commands are inferred from the annotation's endpoints and intent. Generate a `chat` command only when conversational interaction supports the agent's job. Generated agent CLIs are non-interactive and do not use Clack.
 
 `aura` does not publish CLIs in the free tier. The user runs `npm publish` from `dist/<agent>/cli/`. `aura deploy` handles publishing for paid users.
 
-### 4. Skill (`dist/<agent>/SKILL.md`)
+### 4. Skill (`src/agents/<agent>/SKILL.md`)
 
-Claude skill definition, inferred from the agent description in `aura.md`. Interfaces with the agent via the CLI — not the API directly. Copied to project root for use with Claude Code, Cursor, etc.
+Claude skill definition source, inferred from the agent description in `aura.md`. Interfaces with the agent via the CLI — not the API directly. `aura build` copies it to `dist/<agent>/SKILL.md`.
 
 ---
 
@@ -270,24 +299,24 @@ Claude skill definition, inferred from the agent description in `aura.md`. Inter
 
 Fixed. The LLM is instructed to only output TypeScript following these library choices. Do not deviate.
 
-| Concern | Library |
-|---|---|
-| AI SDK | `ai` (Vercel AI SDK v4+) |
-| Anthropic | `@ai-sdk/anthropic` |
-| OpenAI | `@ai-sdk/openai` |
-| HTTP framework | `hono` |
-| MCP transport | `@hono/mcp` — `StreamableHTTPTransport` |
-| Web search | `exa-js` |
-| CLI | `@clack/prompts` |
-| Validation | `zod` |
-| Language | TypeScript |
+| Concern        | Library                                 |
+| -------------- | --------------------------------------- |
+| AI SDK         | `ai` (Vercel AI SDK v4+)                |
+| Anthropic      | `@ai-sdk/anthropic`                     |
+| OpenAI         | `@ai-sdk/openai`                        |
+| HTTP framework | `hono`                                  |
+| MCP transport  | `@hono/mcp` — `StreamableHTTPTransport` |
+| Web search     | `exa-js`                                |
+| Aura CLI       | `@clack/prompts`                        |
+| Validation     | `zod`                                   |
+| Language       | TypeScript                              |
 
 ### Naming Conventions
 
-| Concept | Name in generated code |
-|---|---|
-| Agent system prompt constant | `AGENT_PROMPT` |
-| Agent identifier constant | `AGENT_ID` |
+| Concept                      | Name in generated code |
+| ---------------------------- | ---------------------- |
+| Agent system prompt constant | `AGENT_PROMPT`         |
+| Agent identifier constant    | `AGENT_ID`             |
 
 `AGENT_PROMPT` maps to the `system` field in Vercel AI SDK calls. `SYSTEM_PROMPT` is never used.
 
@@ -295,7 +324,7 @@ Fixed. The LLM is instructed to only output TypeScript following these library c
 
 ## Codegen: TypeScript Compile Validation Loop
 
-After all files are written, `aura` runs `tsc --noEmit`. If there are errors, keep iterating until the bugs are fixed:
+After `aura generate` writes source files to `src/agents/`, `aura` runs `tsc --noEmit` against the generated source. If there are errors, keep iterating until the bugs are fixed:
 
 1. Feed failing files + full `tsc` output back to the LLM — fix compile errors only, don't rewrite logic
 2. Overwrite affected files, re-run `tsc --noEmit`
@@ -340,7 +369,20 @@ aura generate --dry-run    # parse and show what would be generated, write nothi
 
 Re-running always wipes and regenerates from current annotations. No incremental merge.
 
-### `aura deploy` *(paid)*
+### `aura build`
+
+```bash
+aura build              # compile all generated agents from src/agents into dist
+aura build <agent>      # one agent, all generated surfaces
+aura build <agent> api  # one agent, one surface
+aura build <agent> mcp
+aura build <agent> cli
+aura build <agent> skill
+```
+
+`aura build` compiles the generated source tree and copies non-code artifacts like `package.json` and `SKILL.md` into `dist/`.
+
+### `aura deploy` _(paid)_
 
 ```bash
 aura deploy                        # all agents, all surfaces
@@ -354,6 +396,7 @@ aura deploy <agent> skill
 Uses `@pierre/storage` (code.storage TypeScript SDK) to create a repo and push the relevant `dist/<agent>/<surface>/` contents. npm publish for CLI surfaces is handled by Satorico infrastructure.
 
 **Error: surface not generated**
+
 ```
 ✗ No CLI found for agent "my-agent"
 
@@ -362,6 +405,7 @@ Uses `@pierre/storage` (code.storage TypeScript SDK) to create a repo and push t
 ```
 
 **Error: agent not found**
+
 ```
 ✗ No agent "nonexistent" found
 
@@ -396,16 +440,16 @@ Skill: cp dist/<agent>/SKILL.md ./SKILL.md
 
 ## Error Handling
 
-| Failure | Behavior |
-|---|---|
-| `aura.md` not found | Error, prompt to run `aura init` |
-| `aura.config.ts` not found | Verify `aura init` ran. Use defaults, warn user. |
-| Extraction LLM call fails | Verify init. Retry once. |
-| Extraction produces invalid JSON | Retry once. If still invalid, suggest a more capable model. |
-| Codegen won't compile after 5 attempts | Surface tsc error, suggest switching model |
-| `aura deploy` surface missing | Show targeted error with `aura generate` instructions |
-| `aura deploy` agent not found | List available agents |
-| npm update check fails | Silently skip — never block |
+| Failure                                | Behavior                                                    |
+| -------------------------------------- | ----------------------------------------------------------- |
+| `aura.md` not found                    | Error, prompt to run `aura init`                            |
+| `aura.config.ts` not found             | Verify `aura init` ran. Use defaults, warn user.            |
+| Extraction LLM call fails              | Verify init. Retry once.                                    |
+| Extraction produces invalid JSON       | Retry once. If still invalid, suggest a more capable model. |
+| Codegen won't compile after 5 attempts | Surface tsc error, suggest switching model                  |
+| `aura deploy` surface missing          | Show targeted error with `aura generate` instructions       |
+| `aura deploy` agent not found          | List available agents                                       |
+| npm update check fails                 | Silently skip — never block                                 |
 
 ---
 

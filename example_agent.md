@@ -23,9 +23,22 @@ src/agents/<agent-name>/
     package.json      You need to infer n-number of unique commands required for a given agent.
   SKILL.md          ← Claude skill definition. Infer the Skill definition from the prompt in aura.md.
                       By default, this should interface with the CLI.
+
+dist/<agent-name>/
+  agent.js          ← compiled output from `aura build`
+  api/
+    index.js
+    package.json
+  mcp/
+    index.js
+    package.json
+  cli/
+    index.js
+    package.json
+  SKILL.md
 ```
 
-`src/agents/` is where users write their agent descriptions. `dist/` is generated output.
+`aura.md` is the authored source of truth. `aura generate` writes reviewable source to `src/agents/`. `aura build` compiles deployable output to `dist/`.
 
 ---
 
@@ -45,7 +58,7 @@ would result in the agent not working. This should be documented in annotations 
 // ============================================================
 
 // ------------------------------------------------------------
-// dist/<agent-name>/agent.ts
+// src/agents/<agent-name>/agent.ts
 // Core agent logic. Imported by all surfaces.
 // ------------------------------------------------------------
 
@@ -72,12 +85,7 @@ export const agentTools = {
       "Search the web for current information on a topic. Returns a list of relevant results with titles, URLs, and content excerpts.",
     parameters: z.object({
       query: z.string().describe("The search query"),
-      numResults: z
-        .number()
-        .min(1)
-        .max(10)
-        .default(5)
-        .describe("Number of results to return"),
+      numResults: z.number().min(1).max(10).default(5).describe("Number of results to return"),
     }),
     execute: async ({ query, numResults }) => {
       const results = await exa.searchAndContents(query, {
@@ -97,7 +105,7 @@ export const agentTools = {
 
 // Streaming response — used by API and CLI surfaces
 export async function streamAgentResponse(
-  messages: Array<{ role: "user" | "assistant"; content: string }>
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
 ) {
   return streamText({
     model: anthropic("<model-from-metadata>"), // Use the model found in aura.md under metadata. This value comes from aura.config.ts.
@@ -109,9 +117,7 @@ export async function streamAgentResponse(
 }
 
 // Non-streaming response — used by MCP surface
-export async function runAgent(
-  messages: Array<{ role: "user" | "assistant"; content: string }>
-) {
+export async function runAgent(messages: Array<{ role: "user" | "assistant"; content: string }>) {
   return generateText({
     model: anthropic("<model-from-metadata>"),
     system: AGENT_PROMPT,
@@ -132,7 +138,7 @@ See: https://hono.dev/docs/getting-started/basic
 
 ```typescript
 // ------------------------------------------------------------
-// dist/<agent-name>/api/index.ts
+// src/agents/<agent-name>/api/index.ts
 // Hono server. Deployed at: /<agent-name>/api
 // ------------------------------------------------------------
 
@@ -194,14 +200,14 @@ export default app;
 ## `mcp/index.ts`
 
 Hono + `@hono/mcp`. Streamable HTTP transport only. Do not build stdio implementations.
-Using the aura.md prompt, infer n-number of tools to build. Every agent should have at least a `chat` tool.
+Using the aura.md prompt, infer n-number of tools to build. Include a `chat` tool only when conversational interaction matches the agent's intent.
 
 See: https://www.npmjs.com/package/@hono/mcp
 See: https://github.com/modelcontextprotocol/typescript-sdk
 
 ```typescript
 // ------------------------------------------------------------
-// dist/<agent-name>/mcp/index.ts
+// src/agents/<agent-name>/mcp/index.ts
 // MCP server over Streamable HTTP transport.
 // Deployed at: /<agent-name>/mcp
 // ------------------------------------------------------------
@@ -220,7 +226,8 @@ function createMcpServer() {
     version: "1.0.0",
   });
 
-  // Every agent should have at least a chat tool.
+  // This research assistant example includes a chat tool because
+  // conversational interaction matches the agent's intent.
 
   server.tool(
     "chat",
@@ -233,24 +240,21 @@ function createMcpServer() {
           z.object({
             role: z.enum(["user", "assistant"]),
             content: z.string(),
-          })
+          }),
         )
         .optional()
         .default([])
         .describe("Previous messages in the conversation, oldest first"),
     },
     async ({ message, conversationHistory }) => {
-      const messages = [
-        ...conversationHistory,
-        { role: "user" as const, content: message },
-      ];
+      const messages = [...conversationHistory, { role: "user" as const, content: message }];
 
       const result = await runAgent(messages);
 
       return {
         content: [{ type: "text", text: result.text }],
       };
-    }
+    },
   );
 
   return server;
@@ -271,22 +275,19 @@ export default app;
 
 ## `cli/index.ts`
 
-Always use Clack for the CLI library and spinner implementation: https://www.npmjs.com/package/@clack/prompts Use `@clack/prompts` for all interaction including
-argument collection. Use `@clack/core` only if you need unstyled or custom prompt primitives not available in `@clack/prompts`.
+Generated agent CLIs are non-interactive and should be implemented with platform primitives. Use Clack only for the Aura CLI itself. Generate a `chat` command only when it supports the agent's intent. This research assistant example includes `chat` because it is conversational.
 
 ```typescript
 #!/usr/bin/env node
 // ------------------------------------------------------------
-// dist/<agent-name>/cli/index.ts
+// src/agents/<agent-name>/cli/index.ts
 // npx-runnable CLI for the <agent-name> agent.
 // Always use @satorico as the npm organization for deployment.
 //
 // Usage:
-//   npx @satorico/<agent-name>              ← interactive chat
-//   npx @satorico/<agent-name> "What is Deno 2?"  ← one-shot
+//   npx @satorico/<agent-name> chat "What is Deno 2?"
 // ------------------------------------------------------------
 
-import * as p from "@clack/prompts";
 import { createDataStreamDecoder } from "ai";
 
 const DEFAULT_URL = process.env.<AGENT_NAME>_URL || "http://localhost:3000";
@@ -339,51 +340,25 @@ async function sendMessage(
   return fullText;
 }
 
-async function runChat(baseUrl: string) {
-  p.intro("<agent-name>");
+async function main() {
+  const baseUrl = DEFAULT_URL.replace(/\/$/, "");
+  const [command, ...rest] = process.argv.slice(2);
 
-  const history: Message[] = [];
-
-  while (true) {
-    const input = await p.text({
-      message: "You",
-      placeholder: "Ask anything... (Ctrl+C to exit)",
-    });
-
-    if (p.isCancel(input)) {
-      p.outro("Goodbye.");
-      process.exit(0);
-    }
-
-    const userMessage = input as string;
-    history.push({ role: "user", content: userMessage });
-
-    const spinner = p.spinner();
-    spinner.start("Thinking...");
-
-    let reply: string;
-    try {
-      spinner.stop("");
-      reply = await sendMessage(baseUrl, history);
-    } catch (err) {
-      spinner.stop("Error");
-      p.log.error(err instanceof Error ? err.message : String(err));
-      continue;
-    }
-
-    history.push({ role: "assistant", content: reply });
+  if (command !== "chat") {
+    console.error('Usage: <agent-name> chat "Your message here"');
+    process.exit(1);
   }
-}
 
-// If a prompt is passed as a CLI argument, run one-shot. Otherwise run interactive chat.
-const prompt = process.argv[2];
-const baseUrl = DEFAULT_URL.replace(/\/$/, "");
+  const prompt = rest.join(" ").trim();
+  if (!prompt) {
+    console.error("Missing message.");
+    process.exit(1);
+  }
 
-if (prompt) {
   await sendMessage(baseUrl, [{ role: "user", content: prompt }]);
-} else {
-  await runChat(baseUrl);
 }
+
+await main();
 ```
 
 ---
@@ -404,7 +379,6 @@ if (prompt) {
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.0",
     "ai": "^4.0.0"
   },
   "devDependencies": {
@@ -414,15 +388,9 @@ if (prompt) {
   "engines": {
     "node": ">=20"
   },
-  "files": [
-    "dist"
-  ]
+  "files": ["dist"]
 }
 ```
-
-> If the generated CLI requires custom prompt primitives not available in `@clack/prompts`, add `"@clack/core": "^0.4.0"` to dependencies.
-
----
 
 ## `SKILL.md`
 
@@ -451,7 +419,6 @@ description: |
 
 \`\`\`bash
 npx @satorico/<agent-name> chat "Your message here"
-npx @satorico/<agent-name> chat --interactive
 \`\`\`
 ```
 
@@ -464,6 +431,5 @@ Hono: https://hono.dev/docs/getting-started/basic
 @hono/mcp: https://www.npmjs.com/package/@hono/mcp
 Exa: https://exa.ai/docs/reference/search-api-guide
 Model Context Protocol: https://github.com/modelcontextprotocol/typescript-sdk
-Clack (prompts): https://www.npmjs.com/package/@clack/prompts
-Clack (core — custom primitives only): https://www.npmjs.com/package/@clack/core
+Clack (Aura CLI only): https://www.npmjs.com/package/@clack/prompts
 Zod: https://zod.dev/

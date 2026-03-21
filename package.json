@@ -1,0 +1,31 @@
+{
+  "name": "aura",
+  "version": "0.0.0",
+  "bin": {
+    "aura": "./src/cli/index.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli/index.ts",
+    "fmt": "oxfmt --config .oxfmtrc.json",
+    "fmt:check": "oxfmt --config .oxfmtrc.json --check",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "bun-types": "^1.2.18",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "bun@1.2.18"
+}
