@@ -63,7 +63,7 @@ would result in the agent not working. This should be documented in annotations 
 // ------------------------------------------------------------
 
 import { generateText, streamText, tool } from "ai"; // Always use ai-sdk. Do not use other AI libraries to interface with LLMs.
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import Exa from "exa-js"; // Only use exa if approved by the user.
 import { z } from "zod";
 
@@ -108,7 +108,7 @@ export async function streamAgentResponse(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
 ) {
   return streamText({
-    model: anthropic("<model-from-metadata>"), // Use the model found in aura.md under metadata. This value comes from aura.config.ts.
+    model: openai("<model-from-metadata>"), // Use the model found in aura.md under metadata. This value comes from aura.config.ts.
     system: AGENT_PROMPT,
     messages,
     tools: agentTools,
@@ -119,7 +119,7 @@ export async function streamAgentResponse(
 // Non-streaming response — used by MCP surface
 export async function runAgent(messages: Array<{ role: "user" | "assistant"; content: string }>) {
   return generateText({
-    model: anthropic("<model-from-metadata>"),
+    model: openai("<model-from-metadata>"),
     system: AGENT_PROMPT,
     messages,
     tools: agentTools,
