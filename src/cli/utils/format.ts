@@ -11,6 +11,7 @@ export function formatHelp(): string {
     "Usage: aura <command>",
     "",
     "Commands:",
+    "  generate Generate agent source from aura.md",
     "  init    Create aura.config.ts and aura.md in the current directory",
     "  list    Show the agents currently defined in aura.md",
   ].join("\n");

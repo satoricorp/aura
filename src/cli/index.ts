@@ -1,20 +1,22 @@
 #!/usr/bin/env bun
 
 import * as p from "@clack/prompts";
+import { runGenerate } from "./commands/generate";
 import { runInit } from "./commands/init";
 import { runList } from "./commands/list";
 import { formatHelp } from "./utils/format";
 import { checkForAuraUpdates } from "../core/version-check";
 
-type CommandName = "init" | "list";
+type CommandName = "generate" | "init" | "list";
 
-const handlers: Record<CommandName, (cwd: string) => Promise<void>> = {
-  init: runInit,
-  list: runList,
+const handlers: Record<CommandName, (args: string[], cwd: string) => Promise<void>> = {
+  generate: runGenerate,
+  init: async (_args, cwd) => runInit(cwd),
+  list: async (_args, cwd) => runList(cwd),
 };
 
 export async function main(argv = process.argv.slice(2), cwd = process.cwd()): Promise<void> {
-  const [command] = argv;
+  const [command, ...args] = argv;
   const update = await checkForAuraUpdates();
   if (update) {
     p.log.warn(
@@ -31,7 +33,7 @@ export async function main(argv = process.argv.slice(2), cwd = process.cwd()): P
     throw new Error(`Unknown command "${command}".\n\n${formatHelp()}`);
   }
 
-  await handlers[command](cwd);
+  await handlers[command](args, cwd);
 }
 
 function isCommandName(value: string): value is CommandName {
