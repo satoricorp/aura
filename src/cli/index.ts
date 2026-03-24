@@ -4,28 +4,65 @@ import * as p from "@clack/prompts";
 import { runGenerate } from "./commands/generate";
 import { runInit } from "./commands/init";
 import { runList } from "./commands/list";
+import { formatCurrentAuth } from "./commands/whoami";
 import { formatHelp } from "./utils/format";
+import { createAuthService, type CreateAuthServiceOptions } from "../core/auth/service";
+import { loadAuraEnv } from "../core/env";
+import { readAuraVersion } from "../core/package";
 import { checkForAuraUpdates } from "../core/version-check";
+import type { AuthService } from "../core/auth/types";
 
-type CommandName = "generate" | "init" | "list";
+type CommandName = "generate" | "init" | "list" | "login" | "logout" | "whoami" | "version";
+const COMMAND_NAMES: CommandName[] = [
+  "generate",
+  "init",
+  "list",
+  "login",
+  "logout",
+  "whoami",
+  "version",
+];
 
-const handlers: Record<CommandName, (args: string[], cwd: string) => Promise<void>> = {
+export interface MainDeps {
+  authService?: AuthService;
+  authServiceOptions?: CreateAuthServiceOptions;
+  checkForUpdates?: typeof checkForAuraUpdates;
+  createAuthService?: typeof createAuthService;
+  loadEnv?: typeof loadAuraEnv;
+  readVersion?: typeof readAuraVersion;
+}
+
+const handlers: Record<
+  "generate" | "init" | "list",
+  (args: string[], cwd: string) => Promise<void>
+> = {
   generate: runGenerate,
   init: async (_args, cwd) => runInit(cwd),
   list: async (_args, cwd) => runList(cwd),
 };
 
-export async function main(argv = process.argv.slice(2), cwd = process.cwd()): Promise<void> {
+export async function main(
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+  deps: MainDeps = {},
+): Promise<void> {
   const [command, ...args] = argv;
-  const update = await checkForAuraUpdates();
-  if (update) {
-    p.log.warn(
-      `Aura ${update.latestVersion} is available (current ${update.currentVersion}). Set AURA_NO_UPDATES=1 to suppress this check.`,
-    );
-  }
+  const loadEnv = deps.loadEnv ?? loadAuraEnv;
+  const checkForUpdates = deps.checkForUpdates ?? checkForAuraUpdates;
+  const createAuthServiceFromDeps = deps.createAuthService ?? createAuthService;
+  const readVersion = deps.readVersion ?? readAuraVersion;
+
+  await loadEnv(cwd);
+
+  const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(formatHelp());
+    return;
+  }
+
+  if (command === "--version" || command === "-v") {
+    console.log((await readVersion()) ?? "unknown");
     return;
   }
 
@@ -33,11 +70,53 @@ export async function main(argv = process.argv.slice(2), cwd = process.cwd()): P
     throw new Error(`Unknown command "${command}".\n\n${formatHelp()}`);
   }
 
+  if (!isUtilityCommand(command)) {
+    await authService.ensureAuthenticated();
+  }
+
+  const update = await checkForUpdates();
+  if (update) {
+    p.log.warn(
+      `Aura ${update.latestVersion} is available (current ${update.currentVersion}). Set AURA_NO_UPDATES=1 to suppress this check.`,
+    );
+  }
+
+  if (command === "login") {
+    const authState = await authService.login();
+    p.log.success(`Signed in as ${authState.user.email}.`);
+    return;
+  }
+
+  if (command === "logout") {
+    const removed = await authService.logout();
+    if (!removed) {
+      p.log.warn("No saved Aura login was found on this system.");
+      return;
+    }
+
+    p.log.success("Signed out and removed the saved local session.");
+    return;
+  }
+
+  if (command === "whoami") {
+    console.log(await formatCurrentAuth(authService));
+    return;
+  }
+
+  if (command === "version") {
+    console.log((await readVersion()) ?? "unknown");
+    return;
+  }
+
   await handlers[command](args, cwd);
 }
 
 function isCommandName(value: string): value is CommandName {
-  return value in handlers;
+  return COMMAND_NAMES.includes(value as CommandName);
+}
+
+function isUtilityCommand(value: CommandName): boolean {
+  return value === "login" || value === "logout" || value === "whoami" || value === "version";
 }
 
 if (import.meta.main) {

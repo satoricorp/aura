@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.0"
+    "@clack/prompts": "^1.0.0",
+    "convex": "^1.34.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -13,7 +13,11 @@ export function formatHelp(): string {
     "Commands:",
     "  generate Generate agent source from aura.md",
     "  init    Create aura.config.ts and aura.md in the current directory",
+    "  login   Sign in with Google and save a local Aura session",
     "  list    Show the agents currently defined in aura.md",
+    "  logout  Revoke the saved Aura session on this machine",
+    "  version Print the current Aura version",
+    "  whoami  Show the current signed-in Aura user",
   ].join("\n");
 }
 

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readLocalPackage } from "./package";
 
 export interface AuraUpdate {
   currentVersion: string;
@@ -42,23 +42,6 @@ export async function checkForAuraUpdates(): Promise<AuraUpdate | null> {
     return {
       currentVersion: localPackage.version,
       latestVersion: payload.version,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function readLocalPackage(): Promise<{ name: string; version: string } | null> {
-  try {
-    const raw = await readFile(new URL("../../package.json", import.meta.url), "utf8");
-    const parsed = JSON.parse(raw) as { name?: string; version?: string };
-    if (!parsed.name || !parsed.version) {
-      return null;
-    }
-
-    return {
-      name: parsed.name,
-      version: parsed.version,
     };
   } catch {
     return null;
