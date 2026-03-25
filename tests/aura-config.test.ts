@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { createMemkitConfigStore } from "../src/core/auth/memkit-config";
+import { createAuraConfigStore } from "../src/core/auth/aura-config";
 import type { AuthState } from "../src/core/auth/types";
 
 const tempDirectories: string[] = [];
@@ -13,12 +13,12 @@ afterEach(async () => {
   );
 });
 
-describe("memkit config store", () => {
+describe("auth config store", () => {
   test("creates only the auth subtree when the file is missing", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "aura-memkit-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
     tempDirectories.push(directory);
-    const configPath = path.join(directory, "memkit.json");
-    const store = createMemkitConfigStore(configPath);
+    const configPath = path.join(directory, "aura", "aura.json");
+    const store = createAuraConfigStore(configPath);
 
     const loaded = await store.load();
     expect(loaded.exists).toBe(false);
@@ -30,10 +30,11 @@ describe("memkit config store", () => {
     });
   });
 
-  test("preserves unrelated memkit keys when saving auth state", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "aura-memkit-"));
+  test("preserves unrelated config keys when saving auth state", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
     tempDirectories.push(directory);
-    const configPath = path.join(directory, "memkit.json");
+    const configPath = path.join(directory, "aura", "aura.json");
+    await mkdir(path.dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
       JSON.stringify(
@@ -49,7 +50,7 @@ describe("memkit config store", () => {
       "utf8",
     );
 
-    const store = createMemkitConfigStore(configPath);
+    const store = createAuraConfigStore(configPath);
     const loaded = await store.load();
     await store.saveAuthState(createAuthState(), loaded.config);
 
@@ -63,12 +64,13 @@ describe("memkit config store", () => {
   });
 
   test("treats malformed JSON as a safe re-login case", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "aura-memkit-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
     tempDirectories.push(directory);
-    const configPath = path.join(directory, "memkit.json");
+    const configPath = path.join(directory, "aura", "aura.json");
+    await mkdir(path.dirname(configPath), { recursive: true });
     await writeFile(configPath, "{invalid json", "utf8");
 
-    const store = createMemkitConfigStore(configPath);
+    const store = createAuraConfigStore(configPath);
     const loaded = await store.load();
 
     expect(loaded.auth).toBeUndefined();
@@ -76,9 +78,10 @@ describe("memkit config store", () => {
   });
 
   test("ignores an invalid auth block while preserving the rest of the file", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "aura-memkit-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
     tempDirectories.push(directory);
-    const configPath = path.join(directory, "memkit.json");
+    const configPath = path.join(directory, "aura", "aura.json");
+    await mkdir(path.dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
       JSON.stringify(
@@ -94,7 +97,7 @@ describe("memkit config store", () => {
       "utf8",
     );
 
-    const store = createMemkitConfigStore(configPath);
+    const store = createAuraConfigStore(configPath);
     const loaded = await store.load();
 
     expect(loaded.auth).toBeUndefined();

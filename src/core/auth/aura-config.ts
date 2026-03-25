@@ -1,58 +1,19 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { AuthState, LoadedMemkitConfig, MemkitConfigRecord, MemkitConfigStore } from "./types";
+import type { AuraConfigRecord, AuraConfigStore, AuthState, LoadedAuraConfig } from "./types";
 
-export const MEMKIT_CONFIG_PATH = path.join(os.homedir(), ".config", "memkit.json");
+export const AURA_AUTH_CONFIG_PATH = path.join(os.homedir(), ".config", "aura", "aura.json");
 
-export function createMemkitConfigStore(configPath = MEMKIT_CONFIG_PATH): MemkitConfigStore {
+export function createAuraConfigStore(configPath = AURA_AUTH_CONFIG_PATH): AuraConfigStore {
   return {
-    async load(): Promise<LoadedMemkitConfig> {
-      try {
-        const raw = await readFile(configPath, "utf8");
-        const parsed = JSON.parse(raw) as unknown;
-        if (!isJsonObject(parsed)) {
-          return {
-            config: {},
-            exists: true,
-            malformed: true,
-            path: configPath,
-          };
-        }
-
-        return {
-          auth: parseAuthState(parsed.auth),
-          config: parsed as MemkitConfigRecord,
-          exists: true,
-          malformed: false,
-          path: configPath,
-        };
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          (error as NodeJS.ErrnoException).code === "ENOENT"
-        ) {
-          return {
-            config: {},
-            exists: false,
-            malformed: false,
-            path: configPath,
-          };
-        }
-
-        return {
-          config: {},
-          exists: true,
-          malformed: true,
-          path: configPath,
-        };
-      }
+    async load(): Promise<LoadedAuraConfig> {
+      return loadConfigFile(configPath);
     },
 
-    async saveAuthState(authState: AuthState, currentConfig?: MemkitConfigRecord): Promise<void> {
+    async saveAuthState(authState: AuthState, currentConfig?: AuraConfigRecord): Promise<void> {
       const loaded = currentConfig ?? (await this.load()).config;
-      const next: MemkitConfigRecord = {
+      const next: AuraConfigRecord = {
         ...loaded,
         auth: sanitizeAuthState(authState),
       };
@@ -60,16 +21,59 @@ export function createMemkitConfigStore(configPath = MEMKIT_CONFIG_PATH): Memkit
       await writeConfigFile(configPath, next);
     },
 
-    async clearAuthState(currentConfig?: MemkitConfigRecord): Promise<void> {
+    async clearAuthState(currentConfig?: AuraConfigRecord): Promise<void> {
       const loaded = currentConfig ?? (await this.load()).config;
-      const next: MemkitConfigRecord = { ...loaded };
+      const next: AuraConfigRecord = { ...loaded };
       delete next.auth;
       await writeConfigFile(configPath, next);
     },
   };
 }
 
-async function writeConfigFile(configPath: string, contents: MemkitConfigRecord): Promise<void> {
+async function loadConfigFile(configPath: string): Promise<LoadedAuraConfig> {
+  try {
+    const raw = await readFile(configPath, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isJsonObject(parsed)) {
+      return {
+        config: {},
+        exists: true,
+        malformed: true,
+        path: configPath,
+      };
+    }
+
+    return {
+      auth: parseAuthState(parsed.auth),
+      config: parsed as AuraConfigRecord,
+      exists: true,
+      malformed: false,
+      path: configPath,
+    };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return {
+        config: {},
+        exists: false,
+        malformed: false,
+        path: configPath,
+      };
+    }
+
+    return {
+      config: {},
+      exists: true,
+      malformed: true,
+      path: configPath,
+    };
+  }
+}
+
+async function writeConfigFile(configPath: string, contents: AuraConfigRecord): Promise<void> {
   await mkdir(path.dirname(configPath), { recursive: true });
   await writeFile(configPath, `${JSON.stringify(contents, null, 2)}\n`, "utf8");
   await chmod(configPath, 0o600);

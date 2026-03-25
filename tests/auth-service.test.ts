@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { createAuthService } from "../src/core/auth/service";
 import type {
+  AuraConfigRecord,
+  AuraConfigStore,
   AuthState,
   ConvexAuthClient,
   GoogleIdentityProof,
   GoogleOAuthClient,
-  LoadedMemkitConfig,
-  MemkitConfigRecord,
-  MemkitConfigStore,
+  LoadedAuraConfig,
 } from "../src/core/auth/types";
 
 describe("auth service", () => {
   test("logs in through Google when there is no saved session", async () => {
-    const store = new FakeMemkitStore(createLoadedConfig(undefined));
+    const store = new FakeAuraStore(createLoadedConfig(undefined));
     const google = new FakeGoogleOAuthClient();
     const convex = new FakeConvexAuthClient({
       exchangeResult: createAuthState("fresh-session", "2099-01-01T00:00:00.000Z"),
@@ -35,7 +35,7 @@ describe("auth service", () => {
 
   test("reuses a fresh cached JWT without refreshing", async () => {
     const existing = createAuthState("cached-session", "2099-01-01T00:00:00.000Z");
-    const store = new FakeMemkitStore(createLoadedConfig(existing));
+    const store = new FakeAuraStore(createLoadedConfig(existing));
     const google = new FakeGoogleOAuthClient();
     const convex = new FakeConvexAuthClient({
       exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
@@ -59,7 +59,7 @@ describe("auth service", () => {
   test("refreshes silently when the cached JWT is expired", async () => {
     const existing = createAuthState("cached-session", "2026-03-23T11:00:00.000Z");
     const refreshed = createAuthState("cached-session", "2026-03-23T13:00:00.000Z");
-    const store = new FakeMemkitStore(createLoadedConfig(existing));
+    const store = new FakeAuraStore(createLoadedConfig(existing));
     const authService = createAuthService({
       store,
       googleOAuthClient: new FakeGoogleOAuthClient(),
@@ -78,7 +78,7 @@ describe("auth service", () => {
 
   test("falls back to a new browser login when refresh fails", async () => {
     const existing = createAuthState("cached-session", "2026-03-23T11:00:00.000Z");
-    const store = new FakeMemkitStore(createLoadedConfig(existing));
+    const store = new FakeAuraStore(createLoadedConfig(existing));
     const google = new FakeGoogleOAuthClient();
     const convex = new FakeConvexAuthClient({
       exchangeResult: createAuthState("replacement-session", "2026-03-23T13:00:00.000Z"),
@@ -101,7 +101,7 @@ describe("auth service", () => {
 
   test("revokes and clears the saved session on logout", async () => {
     const existing = createAuthState("cached-session", "2099-01-01T00:00:00.000Z");
-    const store = new FakeMemkitStore(createLoadedConfig(existing));
+    const store = new FakeAuraStore(createLoadedConfig(existing));
     const convex = new FakeConvexAuthClient({
       exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
       refreshResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
@@ -120,17 +120,17 @@ describe("auth service", () => {
   });
 });
 
-class FakeMemkitStore implements MemkitConfigStore {
+class FakeAuraStore implements AuraConfigStore {
   savedAuthState: AuthState | undefined;
   clearCalls = 0;
 
-  constructor(private loaded: LoadedMemkitConfig) {}
+  constructor(private loaded: LoadedAuraConfig) {}
 
-  async load(): Promise<LoadedMemkitConfig> {
+  async load(): Promise<LoadedAuraConfig> {
     return this.loaded;
   }
 
-  async saveAuthState(authState: AuthState, currentConfig?: MemkitConfigRecord): Promise<void> {
+  async saveAuthState(authState: AuthState, currentConfig?: AuraConfigRecord): Promise<void> {
     this.savedAuthState = authState;
     this.loaded = {
       ...this.loaded,
@@ -142,7 +142,7 @@ class FakeMemkitStore implements MemkitConfigStore {
     };
   }
 
-  async clearAuthState(currentConfig?: MemkitConfigRecord): Promise<void> {
+  async clearAuthState(currentConfig?: AuraConfigRecord): Promise<void> {
     this.clearCalls += 1;
     const nextConfig = { ...currentConfig };
     delete nextConfig.auth;
@@ -203,13 +203,13 @@ class FakeConvexAuthClient implements ConvexAuthClient {
   }
 }
 
-function createLoadedConfig(auth: AuthState | undefined): LoadedMemkitConfig {
+function createLoadedConfig(auth: AuthState | undefined): LoadedAuraConfig {
   return {
     auth,
     config: auth ? { auth } : {},
     exists: Boolean(auth),
     malformed: false,
-    path: "/tmp/memkit.json",
+    path: "/tmp/aura/aura.json",
   };
 }
 

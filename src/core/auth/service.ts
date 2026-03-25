@@ -1,24 +1,24 @@
 import { HttpConvexAuthClient } from "./convex-auth-client";
 import { GoogleDesktopOAuthClient } from "./google-oauth";
-import { createMemkitConfigStore } from "./memkit-config";
+import { createAuraConfigStore } from "./aura-config";
 import type {
+  AuraConfigStore,
   AuthService,
   AuthState,
   AuthStatus,
   ConvexAuthClient,
   GoogleOAuthClient,
-  MemkitConfigStore,
 } from "./types";
 
 export interface CreateAuthServiceOptions {
-  store?: MemkitConfigStore;
+  store?: AuraConfigStore;
   googleOAuthClient?: GoogleOAuthClient;
   convexAuthClient?: ConvexAuthClient;
   now?: () => Date;
 }
 
 export function createAuthService(options: CreateAuthServiceOptions = {}): AuthService {
-  const store = options.store ?? createMemkitConfigStore();
+  const store = options.store ?? createAuraConfigStore();
   const googleOAuthClient = options.googleOAuthClient ?? new GoogleDesktopOAuthClient();
   const convexAuthClient = options.convexAuthClient ?? new HttpConvexAuthClient();
   const now = options.now ?? (() => new Date());
@@ -101,7 +101,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
 }
 
 async function loginWithFreshBrowserSession(
-  store: MemkitConfigStore,
+  store: AuraConfigStore,
   googleOAuthClient: GoogleOAuthClient,
   convexAuthClient: ConvexAuthClient,
   currentConfig: Record<string, unknown>,

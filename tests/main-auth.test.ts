@@ -132,7 +132,7 @@ class FakeAuthService implements AuthService {
       authenticated: true,
       authState: createAuthState(),
       needsRefresh: false,
-      path: "/tmp/memkit.json",
+      path: "/tmp/aura/aura.json",
     };
   }
 }

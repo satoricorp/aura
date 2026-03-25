@@ -19,14 +19,14 @@ export interface GoogleIdentityProof {
   idToken?: string;
 }
 
-export interface MemkitConfigRecord {
+export interface AuraConfigRecord {
   auth?: AuthState;
   [key: string]: unknown;
 }
 
-export interface LoadedMemkitConfig {
+export interface LoadedAuraConfig {
   auth?: AuthState;
-  config: MemkitConfigRecord;
+  config: AuraConfigRecord;
   exists: boolean;
   malformed: boolean;
   path: string;
@@ -49,10 +49,10 @@ export interface ConvexAuthClient {
   logoutSession(sessionToken: string): Promise<void>;
 }
 
-export interface MemkitConfigStore {
-  load(): Promise<LoadedMemkitConfig>;
-  saveAuthState(authState: AuthState, currentConfig?: MemkitConfigRecord): Promise<void>;
-  clearAuthState(currentConfig?: MemkitConfigRecord): Promise<void>;
+export interface AuraConfigStore {
+  load(): Promise<LoadedAuraConfig>;
+  saveAuthState(authState: AuthState, currentConfig?: AuraConfigRecord): Promise<void>;
+  clearAuthState(currentConfig?: AuraConfigRecord): Promise<void>;
 }
 
 export interface AuthService {
