@@ -62,11 +62,9 @@ describe("Convex JWT helpers", () => {
       type: "pkcs8",
     });
     const originalEnv = {
-      AURA_AUTH_AUDIENCE: process.env.AURA_AUTH_AUDIENCE,
       NODE_ENV: process.env.NODE_ENV,
     };
 
-    delete process.env.AURA_AUTH_AUDIENCE;
     process.env.NODE_ENV = "production";
 
     try {
@@ -89,12 +87,6 @@ describe("Convex JWT helpers", () => {
 
       expect(decoded.aud).toBe("aura-cli-prod");
     } finally {
-      if (originalEnv.AURA_AUTH_AUDIENCE === undefined) {
-        delete process.env.AURA_AUTH_AUDIENCE;
-      } else {
-        process.env.AURA_AUTH_AUDIENCE = originalEnv.AURA_AUTH_AUDIENCE;
-      }
-
       if (originalEnv.NODE_ENV === undefined) {
         delete process.env.NODE_ENV;
       } else {

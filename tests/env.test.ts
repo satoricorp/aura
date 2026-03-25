@@ -57,9 +57,9 @@ INLINE=value # trailing comment
     try {
       await loadAuraEnv(cwd);
 
-      expect(process.env.AURA_CONVEX_URL).toBe("https://new.convex.site");
-      expect(process.env.AURA_GOOGLE_CLIENT_ID).toBe("base-client");
-      expect(process.env.AURA_AUTH_ISSUER).toBe("https://issuer.example.com");
+      expect(process.env.AURA_CONVEX_URL!).toBe("https://new.convex.site");
+      expect(process.env.AURA_GOOGLE_CLIENT_ID!).toBe("base-client");
+      expect(process.env.AURA_AUTH_ISSUER!).toBe("https://issuer.example.com");
     } finally {
       restoreEnv(originalEnv);
     }
@@ -83,8 +83,8 @@ INLINE=value # trailing comment
     try {
       await loadAuraEnv(cwd);
 
-      expect(process.env.AURA_CONVEX_URL).toBe("https://shell.convex.site");
-      expect(process.env.AURA_GOOGLE_CLIENT_ID).toBe("base-client");
+      expect(process.env.AURA_CONVEX_URL!).toBe("https://shell.convex.site");
+      expect(process.env.AURA_GOOGLE_CLIENT_ID!).toBe("base-client");
     } finally {
       restoreEnv(originalEnv);
     }
