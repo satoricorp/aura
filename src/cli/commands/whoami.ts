@@ -15,7 +15,7 @@ export async function formatCurrentAuth(authService = createAuthService()): Prom
   return [
     `Signed in as ${status.authState.user.email}`,
     `User ID: ${status.authState.user.id}`,
-    `JWT: ${status.needsRefresh ? "expired, will refresh on next command" : "fresh"}`,
+    `JWT: ${status.needsRefresh ? "expired, will refresh on next command" : "certified fresh"}`,
     `Config: ${status.path}`,
   ].join("\n");
 }
