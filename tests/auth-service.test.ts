@@ -99,6 +99,32 @@ describe("auth service", () => {
     expect(convex.exchangeCalls).toBe(1);
   });
 
+  test("skips refresh and starts a new login when the cached session token is missing", async () => {
+    const existing = {
+      ...createAuthState("cached-session", "2026-03-23T11:00:00.000Z"),
+      sessionToken: undefined,
+    } as unknown as AuthState;
+    const store = new FakeAuraStore(createLoadedConfig(existing));
+    const google = new FakeGoogleOAuthClient();
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("replacement-session", "2026-03-23T13:00:00.000Z"),
+      refreshResult: createAuthState("unused", "2026-03-23T13:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: google,
+      convexAuthClient: convex,
+      now: () => new Date("2026-03-23T12:00:00.000Z"),
+    });
+
+    const result = await authService.ensureAuthenticated();
+
+    expect(result.sessionToken).toBe("replacement-session");
+    expect(google.authenticateCalls).toBe(1);
+    expect(convex.refreshCalls).toBe(0);
+    expect(convex.exchangeCalls).toBe(1);
+  });
+
   test("revokes and clears the saved session on logout", async () => {
     const existing = createAuthState("cached-session", "2099-01-01T00:00:00.000Z");
     const store = new FakeAuraStore(createLoadedConfig(existing));
@@ -116,6 +142,29 @@ describe("auth service", () => {
 
     expect(removed).toBe(true);
     expect(convex.logoutCalls).toBe(1);
+    expect(store.clearCalls).toBe(1);
+  });
+
+  test("clears the saved session on logout even when the session token is missing", async () => {
+    const existing = {
+      ...createAuthState("cached-session", "2099-01-01T00:00:00.000Z"),
+      sessionToken: undefined,
+    } as unknown as AuthState;
+    const store = new FakeAuraStore(createLoadedConfig(existing));
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+      refreshResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: new FakeGoogleOAuthClient(),
+      convexAuthClient: convex,
+    });
+
+    const removed = await authService.logout();
+
+    expect(removed).toBe(true);
+    expect(convex.logoutCalls).toBe(0);
     expect(store.clearCalls).toBe(1);
   });
 });

@@ -42,8 +42,19 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         return currentAuth;
       }
 
+      const sessionToken = getUsableSessionToken(currentAuth.sessionToken);
+      if (!sessionToken) {
+        return loginWithFreshBrowserSession(
+          store,
+          googleOAuthClient,
+          convexAuthClient,
+          loaded.config,
+          now,
+        );
+      }
+
       try {
-        const refreshed = await convexAuthClient.refreshSession(currentAuth.sessionToken);
+        const refreshed = await convexAuthClient.refreshSession(sessionToken);
         const nextState = {
           ...refreshed,
           lastLoginAt: currentAuth.lastLoginAt ?? refreshed.lastLoginAt,
@@ -80,7 +91,10 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       }
 
       try {
-        await convexAuthClient.logoutSession(loaded.auth.sessionToken);
+        const sessionToken = getUsableSessionToken(loaded.auth.sessionToken);
+        if (sessionToken) {
+          await convexAuthClient.logoutSession(sessionToken);
+        }
       } finally {
         await store.clearAuthState(loaded.config);
       }
@@ -126,4 +140,8 @@ function isExpired(value: string, reference: Date): boolean {
   }
 
   return expiresAt <= reference.getTime();
+}
+
+function getUsableSessionToken(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
