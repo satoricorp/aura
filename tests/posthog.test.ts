@@ -44,6 +44,8 @@ describe("createPostHogClient", () => {
         called = true;
         return new Response(null, { status: 200 });
       }) as unknown as typeof fetch,
+      host: "",
+      projectToken: "",
     });
 
     await client.capture({
