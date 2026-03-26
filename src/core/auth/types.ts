@@ -58,7 +58,7 @@ export interface ConvexAuthClient {
 export interface AuraConfigStore {
   load(): Promise<LoadedAuraConfig>;
   saveAuthState(authState: AuthState, currentConfig?: AuraConfigRecord): Promise<void>;
-  clearAuthState(currentConfig?: AuraConfigRecord): Promise<void>;
+  deleteConfigFile(): Promise<void>;
 }
 
 export interface AuthService {

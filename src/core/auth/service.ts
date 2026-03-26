@@ -87,17 +87,17 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
 
     async logout(): Promise<boolean> {
       const loaded = await store.load();
-      if (!loaded.auth) {
+      if (!loaded.exists) {
         return false;
       }
 
       try {
-        const sessionToken = getUsableSessionToken(loaded.auth.sessionToken);
+        const sessionToken = loaded.auth ? getUsableSessionToken(loaded.auth.sessionToken) : null;
         if (sessionToken) {
           await convexAuthClient.logoutSession(sessionToken);
         }
       } finally {
-        await store.clearAuthState(loaded.config);
+        await store.deleteConfigFile();
       }
 
       return true;

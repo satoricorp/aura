@@ -9,7 +9,7 @@ import { formatHelp } from "./utils/format";
 import { buildCommandAnalyticsProperties } from "../core/analytics/cli";
 import { createPostHogClient, type PostHogClient } from "../core/analytics/posthog";
 import { createAuthService, type CreateAuthServiceOptions } from "../core/auth/service";
-import type { AuthService, AuthStatus } from "../core/auth/types";
+import type { AuthService } from "../core/auth/types";
 import { loadAuraEnv } from "../core/env";
 import { readAuraVersion } from "../core/package";
 import { checkForAuraUpdates } from "../core/version-check";
@@ -42,12 +42,24 @@ const handlers: Record<"generate" | "init" | "list", (args: string[], cwd: strin
   list: async (_args, cwd) => runList(cwd),
 };
 
+type Invocation =
+  | {
+      kind: "help";
+    }
+  | {
+      kind: "version-flag";
+    }
+  | {
+      kind: "command";
+      args: string[];
+      command: CommandName;
+    };
+
 export async function main(
   argv = process.argv.slice(2),
   cwd = process.cwd(),
   deps: MainDeps = {},
 ): Promise<void> {
-  const [command, ...args] = argv;
   const loadEnv = deps.loadEnv ?? loadAuraEnv;
   const checkForUpdates = deps.checkForUpdates ?? checkForAuraUpdates;
   const createAnalytics = deps.createAnalytics ?? createPostHogClient;
@@ -59,37 +71,37 @@ export async function main(
   const analytics = deps.analytics ?? createAnalytics();
 
   const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
-
-  if (!command || command === "help" || command === "--help" || command === "-h") {
-    console.log(formatHelp());
-    return;
-  }
-
-  if (command === "--version" || command === "-v") {
-    console.log(cliVersion);
-    return;
-  }
-
-  if (!isCommandName(command)) {
-    throw new Error(`Unknown command "${command}".\n\n${formatHelp()}`);
-  }
+  const invocation = resolveInvocation(argv);
 
   const startedAt = Date.now();
   let authenticated = false;
   let distinctId: string | undefined;
-  let utilityStatus: AuthStatus | undefined;
 
-  if (!isUtilityCommand(command)) {
+  if (invocation.kind === "command" && invocation.command === "logout") {
+    if (analytics.enabled) {
+      const authStatus = await authService.getStatus();
+      if (authStatus.authenticated && authStatus.authState) {
+        authenticated = true;
+        distinctId = authStatus.authState.user.id;
+      }
+    }
+  } else if (!(invocation.kind === "command" && invocation.command === "login")) {
     const authState = await authService.ensureAuthenticated();
     authenticated = true;
     distinctId = authState.user.id;
-  } else if (analytics.enabled && requiresStatusLookup(command)) {
-    utilityStatus = await authService.getStatus();
-    if (utilityStatus.authenticated && utilityStatus.authState) {
-      authenticated = true;
-      distinctId = utilityStatus.authState.user.id;
-    }
   }
+
+  if (invocation.kind === "help") {
+    console.log(formatHelp());
+    return;
+  }
+
+  if (invocation.kind === "version-flag") {
+    console.log(cliVersion);
+    return;
+  }
+
+  const { command, args } = invocation;
 
   const update = await checkForUpdates();
   if (update) {
@@ -201,16 +213,34 @@ export async function main(
   }
 }
 
+function resolveInvocation(argv: string[]): Invocation {
+  const [command, ...args] = argv;
+
+  if (!command || command === "help" || command === "--help" || command === "-h") {
+    return {
+      kind: "help",
+    };
+  }
+
+  if (command === "--version" || command === "-v") {
+    return {
+      kind: "version-flag",
+    };
+  }
+
+  if (!isCommandName(command)) {
+    throw new Error(`Unknown command "${command}".\n\n${formatHelp()}`);
+  }
+
+  return {
+    kind: "command",
+    args,
+    command,
+  };
+}
+
 function isCommandName(value: string): value is CommandName {
   return COMMAND_NAMES.includes(value as CommandName);
-}
-
-function isUtilityCommand(value: CommandName): boolean {
-  return value === "login" || value === "logout" || value === "whoami" || value === "version";
-}
-
-function requiresStatusLookup(value: CommandName): boolean {
-  return value === "logout" || value === "whoami" || value === "version";
 }
 
 async function captureCommandOutcome(

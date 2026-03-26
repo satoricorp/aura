@@ -63,6 +63,37 @@ describe("auth config store", () => {
     });
   });
 
+  test("deleteConfigFile removes the existing config file", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
+    tempDirectories.push(directory);
+    const configPath = path.join(directory, "aura", "aura.json");
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify({ auth: createAuthState() }, null, 2), "utf8");
+
+    const store = createAuraConfigStore(configPath);
+    await store.deleteConfigFile();
+
+    const loaded = await store.load();
+    expect(loaded.exists).toBe(false);
+    expect(loaded.config).toEqual({});
+  });
+
+  test("saveAuthState recreates the config file after deleteConfigFile", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
+    tempDirectories.push(directory);
+    const configPath = path.join(directory, "aura", "aura.json");
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify({ auth: createAuthState() }, null, 2), "utf8");
+
+    const store = createAuraConfigStore(configPath);
+    await store.deleteConfigFile();
+    await store.saveAuthState(createAuthState());
+
+    expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
+      auth: createAuthState(),
+    });
+  });
+
   test("treats malformed JSON as a safe re-login case", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "aura-config-"));
     tempDirectories.push(directory);

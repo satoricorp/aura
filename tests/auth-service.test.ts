@@ -13,7 +13,7 @@ import type {
 
 describe("auth service", () => {
   test("logs in through Google when there is no saved session", async () => {
-    const store = new FakeAuraStore(createLoadedConfig(undefined));
+    const store = new FakeAuraStore(createLoadedConfig());
     const google = new FakeGoogleOAuthClient();
     const convex = new FakeConvexAuthClient({
       exchangeResult: createAuthState("fresh-session", "2099-01-01T00:00:00.000Z"),
@@ -135,7 +135,7 @@ describe("auth service", () => {
     expect(convex.exchangeCalls).toBe(1);
   });
 
-  test("revokes and clears the saved session on logout", async () => {
+  test("revokes the remote session and deletes the saved config on logout", async () => {
     const existing = createAuthState("cached-session", "2099-01-01T00:00:00.000Z");
     const store = new FakeAuraStore(createLoadedConfig(existing));
     const convex = new FakeConvexAuthClient({
@@ -152,7 +152,7 @@ describe("auth service", () => {
 
     expect(removed).toBe(true);
     expect(convex.logoutCalls).toBe(1);
-    expect(store.clearCalls).toBe(1);
+    expect(store.deleteCalls).toBe(1);
   });
 
   test("login performs a fresh browser exchange on demand", async () => {
@@ -176,7 +176,7 @@ describe("auth service", () => {
     expect(convex.exchangeCalls).toBe(1);
   });
 
-  test("clears the saved session on logout even when the session token is missing", async () => {
+  test("deletes the saved config on logout even when the session token is missing", async () => {
     const existing = {
       ...createAuthState("cached-session", "2099-01-01T00:00:00.000Z"),
       sessionToken: undefined,
@@ -196,13 +196,83 @@ describe("auth service", () => {
 
     expect(removed).toBe(true);
     expect(convex.logoutCalls).toBe(0);
-    expect(store.clearCalls).toBe(1);
+    expect(store.deleteCalls).toBe(1);
+  });
+
+  test("deletes a malformed saved config on logout", async () => {
+    const store = new FakeAuraStore(
+      createLoadedConfig(undefined, {
+        config: {},
+        exists: true,
+        malformed: true,
+      }),
+    );
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+      refreshResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: new FakeGoogleOAuthClient(),
+      convexAuthClient: convex,
+    });
+
+    const removed = await authService.logout();
+
+    expect(removed).toBe(true);
+    expect(convex.logoutCalls).toBe(0);
+    expect(store.deleteCalls).toBe(1);
+  });
+
+  test("deletes a saved config with an invalid auth block on logout", async () => {
+    const store = new FakeAuraStore(
+      createLoadedConfig(undefined, {
+        config: {
+          theme: "light",
+        },
+        exists: true,
+      }),
+    );
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+      refreshResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: new FakeGoogleOAuthClient(),
+      convexAuthClient: convex,
+    });
+
+    const removed = await authService.logout();
+
+    expect(removed).toBe(true);
+    expect(convex.logoutCalls).toBe(0);
+    expect(store.deleteCalls).toBe(1);
+  });
+
+  test("returns false on logout when no config file exists", async () => {
+    const store = new FakeAuraStore(createLoadedConfig());
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+      refreshResult: createAuthState("unused", "2099-01-01T00:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: new FakeGoogleOAuthClient(),
+      convexAuthClient: convex,
+    });
+
+    const removed = await authService.logout();
+
+    expect(removed).toBe(false);
+    expect(convex.logoutCalls).toBe(0);
+    expect(store.deleteCalls).toBe(0);
   });
 });
 
 class FakeAuraStore implements AuraConfigStore {
   savedAuthState: AuthState | undefined;
-  clearCalls = 0;
+  deleteCalls = 0;
 
   constructor(private loaded: LoadedAuraConfig) {}
 
@@ -219,17 +289,19 @@ class FakeAuraStore implements AuraConfigStore {
         ...currentConfig,
         auth: authState,
       },
+      exists: true,
+      malformed: false,
     };
   }
 
-  async clearAuthState(currentConfig?: AuraConfigRecord): Promise<void> {
-    this.clearCalls += 1;
-    const nextConfig = { ...currentConfig };
-    delete nextConfig.auth;
+  async deleteConfigFile(): Promise<void> {
+    this.deleteCalls += 1;
     this.loaded = {
       ...this.loaded,
       auth: undefined,
-      config: nextConfig,
+      config: {},
+      exists: false,
+      malformed: false,
     };
   }
 }
@@ -285,12 +357,21 @@ class FakeConvexAuthClient implements ConvexAuthClient {
   }
 }
 
-function createLoadedConfig(auth: AuthState | undefined): LoadedAuraConfig {
+function createLoadedConfig(
+  auth?: AuthState,
+  options: {
+    config?: AuraConfigRecord;
+    exists?: boolean;
+    malformed?: boolean;
+  } = {},
+): LoadedAuraConfig {
+  const config = options.config ?? (auth ? { auth } : {});
+
   return {
     auth,
-    config: auth ? { auth } : {},
-    exists: Boolean(auth),
-    malformed: false,
+    config,
+    exists: options.exists ?? Boolean(auth ?? options.config),
+    malformed: options.malformed ?? false,
     path: "/tmp/aura/aura.json",
   };
 }

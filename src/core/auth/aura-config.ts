@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AuraConfigRecord, AuraConfigStore, AuthState, LoadedAuraConfig } from "./types";
@@ -21,11 +21,8 @@ export function createAuraConfigStore(configPath = AURA_AUTH_CONFIG_PATH): AuraC
       await writeConfigFile(configPath, next);
     },
 
-    async clearAuthState(currentConfig?: AuraConfigRecord): Promise<void> {
-      const loaded = currentConfig ?? (await this.load()).config;
-      const next: AuraConfigRecord = { ...loaded };
-      delete next.auth;
-      await writeConfigFile(configPath, next);
+    async deleteConfigFile(): Promise<void> {
+      await deleteConfigFile(configPath);
     },
   };
 }
@@ -77,6 +74,22 @@ async function writeConfigFile(configPath: string, contents: AuraConfigRecord): 
   await mkdir(path.dirname(configPath), { recursive: true });
   await writeFile(configPath, `${JSON.stringify(contents, null, 2)}\n`, "utf8");
   await chmod(configPath, 0o600);
+}
+
+async function deleteConfigFile(configPath: string): Promise<void> {
+  try {
+    await unlink(configPath);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {

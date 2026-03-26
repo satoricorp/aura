@@ -15,33 +15,57 @@ afterEach(async () => {
 });
 
 describe("main auth gate", () => {
-  test("help and --version bypass auth and emit no analytics", async () => {
+  test("bare aura and help/version flags authenticate without command analytics", async () => {
     const authService = new FakeAuthService();
     const analytics = new FakeAnalyticsClient();
+    let updateChecks = 0;
+
+    const deps = {
+      analytics,
+      authService,
+      checkForUpdates: async () => {
+        updateChecks += 1;
+        return null;
+      },
+      readVersion: async () => "1.2.3",
+    };
+
+    const bareOutput = await captureConsole(async () => {
+      await main([], process.cwd(), deps);
+    });
 
     const helpOutput = await captureConsole(async () => {
-      await main(["help"], process.cwd(), {
-        analytics,
-        authService,
-        checkForUpdates: async () => null,
-      });
+      await main(["help"], process.cwd(), deps);
+    });
+
+    const longHelpOutput = await captureConsole(async () => {
+      await main(["--help"], process.cwd(), deps);
+    });
+
+    const shortHelpOutput = await captureConsole(async () => {
+      await main(["-h"], process.cwd(), deps);
     });
 
     const versionOutput = await captureConsole(async () => {
-      await main(["--version"], process.cwd(), {
-        analytics,
-        authService,
-        checkForUpdates: async () => null,
-        readVersion: async () => "1.2.3",
-      });
+      await main(["--version"], process.cwd(), deps);
     });
 
-    expect(authService.ensureCalls).toBe(0);
+    const shortVersionOutput = await captureConsole(async () => {
+      await main(["-v"], process.cwd(), deps);
+    });
+
+    expect(authService.ensureCalls).toBe(6);
     expect(authService.loginCalls).toBe(0);
     expect(authService.statusCalls).toBe(0);
     expect(analytics.captures).toHaveLength(0);
+    expect(updateChecks).toBe(0);
+    expect(bareOutput).toContain("Usage: aura <command>");
     expect(helpOutput).toContain("Usage: aura <command>");
+    expect(longHelpOutput).toContain("Usage: aura <command>");
+    expect(shortHelpOutput).toContain("Usage: aura <command>");
+    expect(helpOutput).not.toContain("login");
     expect(versionOutput).toContain("1.2.3");
+    expect(shortVersionOutput).toContain("1.2.3");
   });
 
   test("normal commands require authentication first and emit command completed", async () => {
@@ -138,6 +162,57 @@ Handles support.
     ]);
   });
 
+  test("version and whoami authenticate before running and emit command completed", async () => {
+    const authService = new FakeAuthService();
+    const analytics = new FakeAnalyticsClient();
+    let updateChecks = 0;
+
+    const deps = {
+      analytics,
+      authService,
+      checkForUpdates: async () => {
+        updateChecks += 1;
+        return null;
+      },
+      readVersion: async () => "1.2.3",
+    };
+
+    const versionOutput = await captureConsole(async () => {
+      await main(["version"], process.cwd(), deps);
+    });
+
+    const whoamiOutput = await captureConsole(async () => {
+      await main(["whoami"], process.cwd(), deps);
+    });
+
+    expect(authService.ensureCalls).toBe(2);
+    expect(authService.statusCalls).toBe(1);
+    expect(updateChecks).toBe(2);
+    expect(versionOutput).toContain("1.2.3");
+    expect(whoamiOutput).toContain("Signed in as teammate@example.com");
+    expect(whoamiOutput).toContain("JWT: certified fresh");
+    expect(analytics.captures).toEqual([
+      {
+        distinctId: "user_123",
+        event: "command completed",
+        properties: expect.objectContaining({
+          authenticated: true,
+          command: "version",
+          success: true,
+        }),
+      },
+      {
+        distinctId: "user_123",
+        event: "command completed",
+        properties: expect.objectContaining({
+          authenticated: true,
+          command: "whoami",
+          success: true,
+        }),
+      },
+    ]);
+  });
+
   test("command failures emit command failed", async () => {
     const cwd = await mkdtemp(path.join(tmpdir(), "aura-main-auth-"));
     tempDirectories.push(cwd);
@@ -165,6 +240,31 @@ Handles support.
         }),
       },
     ]);
+  });
+
+  test("unknown commands fail before authentication or update checks", async () => {
+    const authService = new FakeAuthService();
+    const analytics = new FakeAnalyticsClient();
+    let updateChecks = 0;
+
+    await expect(
+      captureConsole(async () => {
+        await main(["nope"], process.cwd(), {
+          analytics,
+          authService,
+          checkForUpdates: async () => {
+            updateChecks += 1;
+            return null;
+          },
+        });
+      }),
+    ).rejects.toThrow('Unknown command "nope".');
+
+    expect(authService.ensureCalls).toBe(0);
+    expect(authService.loginCalls).toBe(0);
+    expect(authService.statusCalls).toBe(0);
+    expect(updateChecks).toBe(0);
+    expect(analytics.captures).toHaveLength(0);
   });
 
   test("loads .env before creating the auth service", async () => {
