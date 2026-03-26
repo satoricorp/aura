@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
+import { stripVTControlCharacters } from "node:util";
 import { main } from "../src/cli/index";
 import type { PostHogCaptureRequest, PostHogClient } from "../src/core/analytics/posthog";
 import type { AuthService, AuthState, AuthStatus } from "../src/core/auth/types";
@@ -15,7 +16,7 @@ afterEach(async () => {
 });
 
 describe("main auth gate", () => {
-  test("bare aura and help/version flags authenticate without command analytics", async () => {
+  test("bare aura and help/version flags render without command analytics", async () => {
     const authService = new FakeAuthService();
     const analytics = new FakeAnalyticsClient();
     let updateChecks = 0;
@@ -54,16 +55,21 @@ describe("main auth gate", () => {
       await main(["-v"], process.cwd(), deps);
     });
 
-    expect(authService.ensureCalls).toBe(6);
+    expect(authService.ensureCalls).toBe(0);
     expect(authService.loginCalls).toBe(0);
-    expect(authService.statusCalls).toBe(0);
+    expect(authService.statusCalls).toBe(4);
     expect(analytics.captures).toHaveLength(0);
     expect(updateChecks).toBe(0);
-    expect(bareOutput).toContain("Usage: aura <command>");
+    expect(bareOutput).toContain("AURA");
+    expect(bareOutput).toContain("© Satori Engineering Inc. 2026 Version 1.2.3");
     expect(helpOutput).toContain("Usage: aura <command>");
+    expect(stripVTControlCharacters(helpOutput)).toContain(
+      "project not created. run `aura init`",
+    );
+    expect(stripVTControlCharacters(helpOutput)).toContain("signed in as teammate@example.com");
+    expect(stripVTControlCharacters(helpOutput)).toContain("aura login");
     expect(longHelpOutput).toContain("Usage: aura <command>");
     expect(shortHelpOutput).toContain("Usage: aura <command>");
-    expect(helpOutput).not.toContain("login");
     expect(versionOutput).toContain("1.2.3");
     expect(shortVersionOutput).toContain("1.2.3");
   });

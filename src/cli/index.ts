@@ -5,13 +5,15 @@ import { runGenerate } from "./commands/generate";
 import { runInit } from "./commands/init";
 import { runList } from "./commands/list";
 import { formatCurrentAuth } from "./commands/whoami";
-import { formatHelp } from "./utils/format";
+import { formatHomeScreen, formatUsage } from "./utils/format";
 import { buildCommandAnalyticsProperties } from "../core/analytics/cli";
 import { createPostHogClient, type PostHogClient } from "../core/analytics/posthog";
 import { createAuthService, type CreateAuthServiceOptions } from "../core/auth/service";
 import type { AuthService } from "../core/auth/types";
 import { loadAuraEnv } from "../core/env";
 import { readAuraVersion } from "../core/package";
+import { pathExists } from "../core/utils/fs";
+import { resolveProjectPaths } from "../core/utils/paths";
 import { checkForAuraUpdates } from "../core/version-check";
 
 type CommandName = "generate" | "init" | "list" | "login" | "logout" | "whoami" | "version";
@@ -68,10 +70,21 @@ export async function main(
 
   await loadEnv(cwd);
   const cliVersion = (await readVersion()) ?? "unknown";
-  const analytics = deps.analytics ?? createAnalytics();
-
-  const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
   const invocation = resolveInvocation(argv);
+
+  if (invocation.kind === "help") {
+    const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
+    console.log(await renderHomeScreen(cwd, cliVersion, authService));
+    return;
+  }
+
+  if (invocation.kind === "version-flag") {
+    console.log(cliVersion);
+    return;
+  }
+
+  const analytics = deps.analytics ?? createAnalytics();
+  const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
 
   const startedAt = Date.now();
   let authenticated = false;
@@ -89,16 +102,6 @@ export async function main(
     const authState = await authService.ensureAuthenticated();
     authenticated = true;
     distinctId = authState.user.id;
-  }
-
-  if (invocation.kind === "help") {
-    console.log(formatHelp());
-    return;
-  }
-
-  if (invocation.kind === "version-flag") {
-    console.log(cliVersion);
-    return;
   }
 
   const { command, args } = invocation;
@@ -229,7 +232,7 @@ function resolveInvocation(argv: string[]): Invocation {
   }
 
   if (!isCommandName(command)) {
-    throw new Error(`Unknown command "${command}".\n\n${formatHelp()}`);
+    throw new Error(`Unknown command "${command}".\n\n${formatUsage()}`);
   }
 
   return {
@@ -271,6 +274,28 @@ async function captureCommandOutcome(
       platform: process.platform,
       success: input.success,
     }),
+  });
+}
+
+async function renderHomeScreen(
+  cwd: string,
+  cliVersion: string,
+  authService: AuthService,
+): Promise<string> {
+  const { auraFile, configFile } = resolveProjectPaths(cwd);
+  const [authStatus, hasAuraFile, hasConfigFile] = await Promise.all([
+    authService.getStatus(),
+    pathExists(auraFile),
+    pathExists(configFile),
+  ]);
+
+  return formatHomeScreen({
+    cliVersion,
+    hasAuraFile,
+    hasConfigFile,
+    authenticated: authStatus.authenticated,
+    email: authStatus.authState?.user.email,
+    needsRefresh: authStatus.needsRefresh,
   });
 }
 
