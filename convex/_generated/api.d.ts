@@ -11,6 +11,7 @@
 import type * as authActions from "../authActions.js";
 import type * as authState from "../authState.js";
 import type * as http from "../http.js";
+import type * as lib_authAnalytics from "../lib/authAnalytics.js";
 import type * as lib_authEnv from "../lib/authEnv.js";
 import type * as lib_google from "../lib/google.js";
 import type * as lib_jwt from "../lib/jwt.js";
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   authActions: typeof authActions;
   authState: typeof authState;
   http: typeof http;
+  "lib/authAnalytics": typeof lib_authAnalytics;
   "lib/authEnv": typeof lib_authEnv;
   "lib/google": typeof lib_google;
   "lib/jwt": typeof lib_jwt;
