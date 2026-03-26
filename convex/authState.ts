@@ -24,11 +24,14 @@ export const upsertGoogleUser = mutationGeneric({
       });
 
       return {
-        convexUserId: existing._id,
-        id: String(existing._id),
-        email: args.email,
-        name: args.name,
-        picture: args.picture,
+        isNewUser: false,
+        user: {
+          convexUserId: existing._id,
+          id: String(existing._id),
+          email: args.email,
+          name: args.name,
+          picture: args.picture,
+        },
       };
     }
 
@@ -42,11 +45,14 @@ export const upsertGoogleUser = mutationGeneric({
     });
 
     return {
-      convexUserId: userId,
-      id: String(userId),
-      email: args.email,
-      name: args.name,
-      picture: args.picture,
+      isNewUser: true,
+      user: {
+        convexUserId: userId,
+        id: String(userId),
+        email: args.email,
+        name: args.name,
+        picture: args.picture,
+      },
     };
   },
 });

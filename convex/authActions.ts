@@ -2,26 +2,31 @@
 
 import { anyApi, actionGeneric } from "convex/server";
 import { v } from "convex/values";
+import { createPostHogClient } from "../src/core/analytics/posthog";
+import { captureSuccessfulGoogleLogin } from "./lib/authAnalytics";
 import { fetchGoogleUserProfile } from "./lib/google";
 import { createSessionToken, hashSessionToken, signConvexJwt } from "./lib/jwt";
 
 export const exchangeGoogleLogin = actionGeneric({
   args: {
     accessToken: v.string(),
+    cliVersion: v.optional(v.string()),
     idToken: v.optional(v.string()),
     platform: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const analytics = createPostHogClient();
     const now = new Date().toISOString();
     const googleProfile = await fetchGoogleUserProfile(args.accessToken);
-    const user = await ctx.runMutation(anyApi.authState.upsertGoogleUser, {
+    const userResult = await ctx.runMutation(anyApi.authState.upsertGoogleUser, {
       googleSubject: googleProfile.sub,
       email: googleProfile.email,
       name: googleProfile.name,
       picture: googleProfile.picture,
       loggedInAt: now,
     });
+    const user = userResult.user;
 
     const sessionToken = createSessionToken();
     const sessionId = await ctx.runMutation(anyApi.authState.createSessionRecord, {
@@ -38,6 +43,15 @@ export const exchangeGoogleLogin = actionGeneric({
       name: user.name,
       picture: user.picture,
       sessionId: String(sessionId),
+    });
+
+    await captureSuccessfulGoogleLogin(analytics, {
+      cliVersion: args.cliVersion,
+      isNewUser: userResult.isNewUser,
+      loginAt: now,
+      platform: args.platform,
+      user,
+      userAgent: args.userAgent,
     });
 
     return {

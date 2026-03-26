@@ -1,4 +1,4 @@
-import type { AuthState, ConvexAuthClient, GoogleIdentityProof } from "./types";
+import type { AuthState, ConvexAuthClient, GoogleLoginExchangePayload } from "./types";
 
 export interface HttpConvexAuthClientOptions {
   baseUrl?: string;
@@ -14,7 +14,7 @@ export class HttpConvexAuthClient implements ConvexAuthClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async exchangeGoogleLogin(proof: GoogleIdentityProof): Promise<AuthState> {
+  async exchangeGoogleLogin(proof: GoogleLoginExchangePayload): Promise<AuthState> {
     return this.postJson("/auth/exchange-google-login", proof);
   }
 

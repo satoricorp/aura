@@ -1,6 +1,7 @@
 import { HttpConvexAuthClient } from "./convex-auth-client";
 import { GoogleDesktopOAuthClient } from "./google-oauth";
 import { createAuraConfigStore } from "./aura-config";
+import { readAuraVersion } from "../package";
 import type {
   AuraConfigStore,
   AuthService,
@@ -73,6 +74,17 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       }
     },
 
+    async login(): Promise<AuthState> {
+      const loaded = await store.load();
+      return loginWithFreshBrowserSession(
+        store,
+        googleOAuthClient,
+        convexAuthClient,
+        loaded.config,
+        now,
+      );
+    },
+
     async logout(): Promise<boolean> {
       const loaded = await store.load();
       if (!loaded.auth) {
@@ -111,7 +123,13 @@ async function loginWithFreshBrowserSession(
   now: () => Date,
 ): Promise<AuthState> {
   const proof = await googleOAuthClient.authenticate();
-  const state = await convexAuthClient.exchangeGoogleLogin(proof);
+  const cliVersion = (await readAuraVersion()) ?? "unknown";
+  const state = await convexAuthClient.exchangeGoogleLogin({
+    ...proof,
+    cliVersion,
+    platform: process.platform,
+    userAgent: `aura/${cliVersion}`,
+  });
   const timestamp = now().toISOString();
   const nextState: AuthState = {
     ...state,

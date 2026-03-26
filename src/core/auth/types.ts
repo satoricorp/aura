@@ -19,6 +19,12 @@ export interface GoogleIdentityProof {
   idToken?: string;
 }
 
+export interface GoogleLoginExchangePayload extends GoogleIdentityProof {
+  cliVersion?: string;
+  platform?: string;
+  userAgent?: string;
+}
+
 export interface AuraConfigRecord {
   auth?: AuthState;
   [key: string]: unknown;
@@ -44,7 +50,7 @@ export interface GoogleOAuthClient {
 }
 
 export interface ConvexAuthClient {
-  exchangeGoogleLogin(proof: GoogleIdentityProof): Promise<AuthState>;
+  exchangeGoogleLogin(proof: GoogleLoginExchangePayload): Promise<AuthState>;
   refreshSession(sessionToken: string): Promise<AuthState>;
   logoutSession(sessionToken: string): Promise<void>;
 }
@@ -57,6 +63,7 @@ export interface AuraConfigStore {
 
 export interface AuthService {
   ensureAuthenticated(): Promise<AuthState>;
+  login(): Promise<AuthState>;
   logout(): Promise<boolean>;
   getStatus(): Promise<AuthStatus>;
 }

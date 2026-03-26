@@ -6,6 +6,7 @@ import type {
   AuthState,
   ConvexAuthClient,
   GoogleIdentityProof,
+  GoogleLoginExchangePayload,
   GoogleOAuthClient,
   LoadedAuraConfig,
 } from "../src/core/auth/types";
@@ -31,6 +32,15 @@ describe("auth service", () => {
     expect(convex.exchangeCalls).toBe(1);
     expect(convex.refreshCalls).toBe(0);
     expect(store.savedAuthState?.lastLoginAt).toBe("2026-03-23T12:00:00.000Z");
+    expect(convex.lastExchangePayload).toMatchObject({
+      accessToken: "google-access-token",
+      idToken: "google-id-token",
+      platform: process.platform,
+    });
+    expect(convex.lastExchangePayload?.cliVersion).toEqual(expect.any(String));
+    expect(convex.lastExchangePayload?.userAgent).toBe(
+      `aura/${convex.lastExchangePayload?.cliVersion}`,
+    );
   });
 
   test("reuses a fresh cached JWT without refreshing", async () => {
@@ -145,6 +155,27 @@ describe("auth service", () => {
     expect(store.clearCalls).toBe(1);
   });
 
+  test("login performs a fresh browser exchange on demand", async () => {
+    const existing = createAuthState("cached-session", "2099-01-01T00:00:00.000Z");
+    const store = new FakeAuraStore(createLoadedConfig(existing));
+    const google = new FakeGoogleOAuthClient();
+    const convex = new FakeConvexAuthClient({
+      exchangeResult: createAuthState("fresh-session", "2099-01-01T00:00:00.000Z"),
+    });
+    const authService = createAuthService({
+      store,
+      googleOAuthClient: google,
+      convexAuthClient: convex,
+      now: () => new Date("2026-03-23T12:00:00.000Z"),
+    });
+
+    const result = await authService.login();
+
+    expect(result.sessionToken).toBe("fresh-session");
+    expect(google.authenticateCalls).toBe(1);
+    expect(convex.exchangeCalls).toBe(1);
+  });
+
   test("clears the saved session on logout even when the session token is missing", async () => {
     const existing = {
       ...createAuthState("cached-session", "2099-01-01T00:00:00.000Z"),
@@ -219,6 +250,7 @@ class FakeConvexAuthClient implements ConvexAuthClient {
   exchangeCalls = 0;
   refreshCalls = 0;
   logoutCalls = 0;
+  lastExchangePayload: GoogleLoginExchangePayload | undefined;
   private readonly exchangeResult: AuthState;
   private readonly refreshResult: AuthState;
   private readonly refreshError?: Error;
@@ -233,8 +265,9 @@ class FakeConvexAuthClient implements ConvexAuthClient {
     this.refreshError = options.refreshError;
   }
 
-  async exchangeGoogleLogin(): Promise<AuthState> {
+  async exchangeGoogleLogin(payload: GoogleLoginExchangePayload): Promise<AuthState> {
     this.exchangeCalls += 1;
+    this.lastExchangePayload = payload;
     return this.exchangeResult;
   }
 
