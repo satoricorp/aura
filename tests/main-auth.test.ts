@@ -14,17 +14,20 @@ afterEach(async () => {
 });
 
 describe("main auth gate", () => {
-  test("help bypasses authentication", async () => {
+  test("help authenticates first and does not list a login command", async () => {
     const authService = new FakeAuthService();
 
-    await captureConsole(async () => {
+    const output = await captureConsole(async () => {
       await main(["help"], process.cwd(), {
         authService,
         checkForUpdates: async () => null,
       });
     });
 
-    expect(authService.ensureCalls).toBe(0);
+    expect(authService.statusCalls).toBe(1);
+    expect(authService.ensureCalls).toBe(1);
+    expect(output).toContain("Usage: aura <command>");
+    expect(output).not.toContain("login   Sign in with Google and save a local Aura session");
   });
 
   test("normal commands require authentication first", async () => {
@@ -45,32 +48,62 @@ Handles support.
     expect(authService.ensureCalls).toBe(1);
   });
 
-  test("login bypasses the auth gate and uses the explicit login flow", async () => {
-    const authService = new FakeAuthService();
+  test("signed-out commands complete login and ask the user to rerun the command", async () => {
+    const cwd = await createTempProject(`# Aura Agents
 
-    await captureConsole(async () => {
-      await main(["login"], process.cwd(), {
+## Support Bot
+Handles support.
+`);
+    const authService = new FakeAuthService({
+      authenticated: false,
+    });
+
+    const output = await captureConsole(async () => {
+      await main(["list"], cwd, {
         authService,
         checkForUpdates: async () => null,
       });
     });
 
-    expect(authService.ensureCalls).toBe(0);
-    expect(authService.loginCalls).toBe(1);
+    expect(authService.statusCalls).toBe(1);
+    expect(authService.ensureCalls).toBe(1);
+    expect(output).toContain("Run `aura list` again.");
+    expect(output).not.toContain("support-bot");
   });
 
-  test("whoami bypasses ensureAuthenticated and reads auth status", async () => {
-    const authService = new FakeAuthService();
+  test("signed-out bare aura completes login and asks the user to rerun aura for help", async () => {
+    const authService = new FakeAuthService({
+      authenticated: false,
+    });
 
-    await captureConsole(async () => {
-      await main(["whoami"], process.cwd(), {
+    const output = await captureConsole(async () => {
+      await main([], process.cwd(), {
         authService,
         checkForUpdates: async () => null,
       });
     });
 
-    expect(authService.ensureCalls).toBe(0);
     expect(authService.statusCalls).toBe(1);
+    expect(authService.ensureCalls).toBe(1);
+    expect(output).toContain("Run `aura` again for the help menu.");
+    expect(output).not.toContain("Usage: aura <command>");
+  });
+
+  test("logout bypasses the login flow and clears the saved session immediately", async () => {
+    const authService = new FakeAuthService({
+      authenticated: false,
+    });
+
+    await captureConsole(async () => {
+      await main(["logout"], process.cwd(), {
+        authService,
+        checkForUpdates: async () => null,
+      });
+    });
+
+    expect(authService.statusCalls).toBe(0);
+    expect(authService.ensureCalls).toBe(0);
+    expect(authService.logoutCalls).toBe(1);
   });
 
   test("loads .env before creating the auth service", async () => {
@@ -107,17 +140,16 @@ Handles support.
 
 class FakeAuthService implements AuthService {
   ensureCalls = 0;
-  loginCalls = 0;
   logoutCalls = 0;
   statusCalls = 0;
+  private readonly authenticated: boolean;
+
+  constructor(options: { authenticated?: boolean } = {}) {
+    this.authenticated = options.authenticated ?? true;
+  }
 
   async ensureAuthenticated(): Promise<AuthState> {
     this.ensureCalls += 1;
-    return createAuthState();
-  }
-
-  async login(): Promise<AuthState> {
-    this.loginCalls += 1;
     return createAuthState();
   }
 
@@ -129,8 +161,8 @@ class FakeAuthService implements AuthService {
   async getStatus(): Promise<AuthStatus> {
     this.statusCalls += 1;
     return {
-      authenticated: true,
-      authState: createAuthState(),
+      authenticated: this.authenticated,
+      authState: this.authenticated ? createAuthState() : undefined,
       needsRefresh: false,
       path: "/tmp/aura/aura.json",
     };
@@ -144,14 +176,19 @@ async function createTempProject(auraMarkdown: string): Promise<string> {
   return cwd;
 }
 
-async function captureConsole(run: () => Promise<void>): Promise<void> {
+async function captureConsole(run: () => Promise<void>): Promise<string> {
   const originalLog = console.log;
-  console.log = () => {};
+  const calls: string[] = [];
+  console.log = (...args: unknown[]) => {
+    calls.push(args.map(String).join(" "));
+  };
   try {
     await run();
   } finally {
     console.log = originalLog;
   }
+
+  return calls.join("\n");
 }
 
 function createAuthState(): AuthState {

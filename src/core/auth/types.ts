@@ -57,7 +57,6 @@ export interface AuraConfigStore {
 
 export interface AuthService {
   ensureAuthenticated(): Promise<AuthState>;
-  login(): Promise<AuthState>;
   logout(): Promise<boolean>;
   getStatus(): Promise<AuthStatus>;
 }

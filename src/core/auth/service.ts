@@ -73,17 +73,6 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       }
     },
 
-    async login(): Promise<AuthState> {
-      const loaded = await store.load();
-      return loginWithFreshBrowserSession(
-        store,
-        googleOAuthClient,
-        convexAuthClient,
-        loaded.config,
-        now,
-      );
-    },
-
     async logout(): Promise<boolean> {
       const loaded = await store.load();
       if (!loaded.auth) {
