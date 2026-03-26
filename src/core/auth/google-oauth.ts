@@ -9,6 +9,10 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALLBACK_HOST = "127.0.0.1";
 const GOOGLE_SCOPES = ["openid", "email", "profile"];
 const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
+const OSC_8 = "\u001B]8;;";
+const OSC_8_END = "\u0007";
+const UNDERLINE_ON = "\u001B[4m";
+const UNDERLINE_OFF = "\u001B[24m";
 
 export interface GoogleDesktopOAuthClientOptions {
   clientId?: string;
@@ -48,12 +52,11 @@ export class GoogleDesktopOAuthClient implements GoogleOAuthClient {
     });
 
     const opened = await openSystemBrowser(authorizationUrl.toString());
-    if (!opened) {
-      this.announce("Open this URL in your browser to continue signing in:");
-      this.announce(authorizationUrl.toString());
-    } else {
-      this.announce("A browser window was opened for Google sign-in.");
-      this.announce(`If it did not open, use this URL instead:\n${authorizationUrl.toString()}`);
+    for (const message of formatGoogleSignInAnnouncements({
+      authorizationUrl: authorizationUrl.toString(),
+      browserOpened: opened,
+    })) {
+      this.announce(message);
     }
 
     try {
@@ -93,6 +96,66 @@ export function buildGoogleAuthorizationUrl(options: {
     include_granted_scopes: "true",
   }).toString();
   return url;
+}
+
+export function formatGoogleSignInAnnouncements(options: {
+  authorizationUrl: string;
+  browserOpened: boolean;
+  terminalSupportsHyperlinks?: boolean;
+}): string[] {
+  const supportsHyperlinks =
+    options.terminalSupportsHyperlinks ?? supportsTerminalHyperlinks(process.stdout, process.env);
+
+  if (supportsHyperlinks) {
+    if (options.browserOpened) {
+      return [
+        "A browser window was opened for Google sign-in.",
+        `If it did not open, ${formatTerminalHyperlink("use this URL", options.authorizationUrl)}.`,
+      ];
+    }
+
+    return [
+      `Open ${formatTerminalHyperlink("this URL", options.authorizationUrl)} in your browser to continue signing in.`,
+    ];
+  }
+
+  if (options.browserOpened) {
+    return [
+      "A browser window was opened for Google sign-in.",
+      `If it did not open, use this URL instead:\n${options.authorizationUrl}`,
+    ];
+  }
+
+  return ["Open this URL in your browser to continue signing in:", options.authorizationUrl];
+}
+
+export function supportsTerminalHyperlinks(
+  output: Pick<NodeJS.WriteStream, "isTTY"> = process.stdout,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (output.isTTY !== true) {
+    return false;
+  }
+
+  if (
+    env.TERM_PROGRAM === "iTerm.app" ||
+    env.TERM_PROGRAM === "ghostty" ||
+    env.TERM_PROGRAM === "WezTerm" ||
+    env.TERM_PROGRAM === "vscode"
+  ) {
+    return true;
+  }
+
+  if (env.WT_SESSION || env.KONSOLE_VERSION || env.DOMTERM) {
+    return true;
+  }
+
+  if (env.TERM === "xterm-kitty" || env.TERM === "xterm-ghostty") {
+    return true;
+  }
+
+  const vteVersion = Number.parseInt(env.VTE_VERSION ?? "", 10);
+  return Number.isInteger(vteVersion) && vteVersion >= 5000;
 }
 
 export async function exchangeAuthorizationCode(
@@ -220,4 +283,8 @@ async function createLoopbackServer(expectedState: string): Promise<{
 
 function randomBase64Url(bytes: number): string {
   return randomBytes(bytes).toString("base64url");
+}
+
+function formatTerminalHyperlink(label: string, url: string): string {
+  return `${OSC_8}${url}${OSC_8_END}${UNDERLINE_ON}${label}${UNDERLINE_OFF}${OSC_8}${OSC_8_END}`;
 }

@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   buildGoogleAuthorizationUrl,
   exchangeAuthorizationCode,
+  formatGoogleSignInAnnouncements,
+  supportsTerminalHyperlinks,
 } from "../src/core/auth/google-oauth";
 
 describe("buildGoogleAuthorizationUrl", () => {
@@ -86,5 +88,128 @@ describe("exchangeAuthorizationCode", () => {
     );
 
     expect(observedBody).not.toContain("client_secret=");
+  });
+});
+
+describe("formatGoogleSignInAnnouncements", () => {
+  const url = "https://accounts.google.com/o/oauth2/v2/auth?client_id=test-client";
+
+  test("uses a terminal hyperlink when the browser was opened and links are supported", () => {
+    const messages = formatGoogleSignInAnnouncements({
+      authorizationUrl: url,
+      browserOpened: true,
+      terminalSupportsHyperlinks: true,
+    });
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toBe("A browser window was opened for Google sign-in.");
+    expect(messages[1]).toBe(
+      `If it did not open, \u001B]8;;${url}\u0007\u001B[4muse this URL\u001B[24m\u001B]8;;\u0007.`,
+    );
+    expect(messages).not.toContain(url);
+    expect(messages[1]).not.toContain(`\n${url}`);
+  });
+
+  test("preserves the raw URL fallback when the browser was opened and links are unsupported", () => {
+    const messages = formatGoogleSignInAnnouncements({
+      authorizationUrl: url,
+      browserOpened: true,
+      terminalSupportsHyperlinks: false,
+    });
+
+    expect(messages).toEqual([
+      "A browser window was opened for Google sign-in.",
+      `If it did not open, use this URL instead:\n${url}`,
+    ]);
+  });
+
+  test("uses a terminal hyperlink when the browser was not opened and links are supported", () => {
+    const messages = formatGoogleSignInAnnouncements({
+      authorizationUrl: url,
+      browserOpened: false,
+      terminalSupportsHyperlinks: true,
+    });
+
+    expect(messages).toEqual([
+      `Open \u001B]8;;${url}\u0007\u001B[4mthis URL\u001B[24m\u001B]8;;\u0007 in your browser to continue signing in.`,
+    ]);
+    expect(messages).not.toContain(url);
+  });
+
+  test("preserves the raw URL fallback when the browser was not opened and links are unsupported", () => {
+    const messages = formatGoogleSignInAnnouncements({
+      authorizationUrl: url,
+      browserOpened: false,
+      terminalSupportsHyperlinks: false,
+    });
+
+    expect(messages).toEqual(["Open this URL in your browser to continue signing in:", url]);
+  });
+});
+
+describe("supportsTerminalHyperlinks", () => {
+  test("returns true for supported TERM_PROGRAM markers on a TTY", () => {
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: true },
+        {
+          TERM_PROGRAM: "WezTerm",
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("returns true for Ghostty markers on a TTY", () => {
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: true },
+        {
+          TERM_PROGRAM: "ghostty",
+        },
+      ),
+    ).toBe(true);
+
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: true },
+        {
+          TERM: "xterm-ghostty",
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("returns true for supported VTE_VERSION values on a TTY", () => {
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: true },
+        {
+          VTE_VERSION: "6003",
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("returns false when stdout is not a TTY even if markers are present", () => {
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: false },
+        {
+          TERM_PROGRAM: "iTerm.app",
+          WT_SESSION: "1",
+        },
+      ),
+    ).toBe(false);
+  });
+
+  test("returns false when no supported markers are present", () => {
+    expect(
+      supportsTerminalHyperlinks(
+        { isTTY: true },
+        {
+          TERM_PROGRAM: "Terminal.app",
+        },
+      ),
+    ).toBe(false);
   });
 });
