@@ -1,9 +1,6 @@
 #!/usr/bin/env bun
 
 import * as p from "@clack/prompts";
-import { runGenerate } from "./commands/generate";
-import { runInit } from "./commands/init";
-import { runList } from "./commands/list";
 import { formatCurrentAuth } from "./commands/whoami";
 import { formatHomeScreen, formatUsage } from "./utils/format";
 import { buildCommandAnalyticsProperties } from "../core/analytics/cli";
@@ -12,20 +9,10 @@ import { createAuthService, type CreateAuthServiceOptions } from "../core/auth/s
 import type { AuthService } from "../core/auth/types";
 import { loadAuraEnv } from "../core/env";
 import { readAuraVersion } from "../core/package";
-import { pathExists } from "../core/utils/fs";
-import { resolveProjectPaths } from "../core/utils/paths";
 import { checkForAuraUpdates } from "../core/version-check";
 
-type CommandName = "generate" | "init" | "list" | "login" | "logout" | "whoami" | "version";
-const COMMAND_NAMES: CommandName[] = [
-  "generate",
-  "init",
-  "list",
-  "login",
-  "logout",
-  "whoami",
-  "version",
-];
+type CommandName = "login" | "logout" | "whoami" | "version";
+const COMMAND_NAMES: CommandName[] = ["login", "logout", "whoami", "version"];
 
 export interface MainDeps {
   analytics?: PostHogClient;
@@ -37,12 +24,6 @@ export interface MainDeps {
   loadEnv?: typeof loadAuraEnv;
   readVersion?: typeof readAuraVersion;
 }
-
-const handlers: Record<"generate" | "init" | "list", (args: string[], cwd: string) => Promise<void>> = {
-  generate: runGenerate,
-  init: async (_args, cwd) => runInit(cwd),
-  list: async (_args, cwd) => runList(cwd),
-};
 
 type Invocation =
   | {
@@ -74,7 +55,7 @@ export async function main(
 
   if (invocation.kind === "help") {
     const authService = deps.authService ?? createAuthServiceFromDeps(deps.authServiceOptions);
-    console.log(await renderHomeScreen(cwd, cliVersion, authService));
+    console.log(await renderHomeScreen(cliVersion, authService));
     return;
   }
 
@@ -90,7 +71,7 @@ export async function main(
   let authenticated = false;
   let distinctId: string | undefined;
 
-  if (invocation.kind === "command" && invocation.command === "logout") {
+  if (invocation.command === "logout") {
     if (analytics.enabled) {
       const authStatus = await authService.getStatus();
       if (authStatus.authenticated && authStatus.authState) {
@@ -98,10 +79,12 @@ export async function main(
         distinctId = authStatus.authState.user.id;
       }
     }
-  } else if (!(invocation.kind === "command" && invocation.command === "login")) {
-    const authState = await authService.ensureAuthenticated();
-    authenticated = true;
-    distinctId = authState.user.id;
+  } else {
+    const authStatus = await authService.getStatus();
+    if (authStatus.authenticated && authStatus.authState) {
+      authenticated = true;
+      distinctId = authStatus.authState.user.id;
+    }
   }
 
   const { command, args } = invocation;
@@ -116,8 +99,8 @@ export async function main(
   try {
     if (command === "login") {
       const authState = await authService.login();
-      authenticated = true;
       distinctId = authState.user.id;
+      authenticated = true;
       p.log.success(`Signed in as ${authState.user.email}.`);
       await captureCommandOutcome(analytics, {
         args,
@@ -191,17 +174,6 @@ export async function main(
       });
       return;
     }
-
-    await handlers[command](args, cwd);
-    await captureCommandOutcome(analytics, {
-      args,
-      authenticated,
-      cliVersion,
-      command,
-      distinctId,
-      durationMs: Date.now() - startedAt,
-      success: true,
-    });
   } catch (error) {
     await captureCommandOutcome(analytics, {
       args,
@@ -277,22 +249,11 @@ async function captureCommandOutcome(
   });
 }
 
-async function renderHomeScreen(
-  cwd: string,
-  cliVersion: string,
-  authService: AuthService,
-): Promise<string> {
-  const { auraFile, configFile } = resolveProjectPaths(cwd);
-  const [authStatus, hasAuraFile, hasConfigFile] = await Promise.all([
-    authService.getStatus(),
-    pathExists(auraFile),
-    pathExists(configFile),
-  ]);
+async function renderHomeScreen(cliVersion: string, authService: AuthService): Promise<string> {
+  const authStatus = await authService.getStatus();
 
   return formatHomeScreen({
     cliVersion,
-    hasAuraFile,
-    hasConfigFile,
     authenticated: authStatus.authenticated,
     email: authStatus.authState?.user.email,
     needsRefresh: authStatus.needsRefresh,

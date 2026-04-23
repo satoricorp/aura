@@ -17,7 +17,7 @@ describe("createPostHogClient", () => {
       distinctId: "user_123",
       event: "command completed",
       properties: {
-        command: "list",
+        command: "whoami",
         optional: undefined,
         success: true,
       },
@@ -31,7 +31,7 @@ describe("createPostHogClient", () => {
       distinct_id: "user_123",
       event: "command completed",
       properties: {
-        command: "list",
+        command: "whoami",
         success: true,
       },
     });

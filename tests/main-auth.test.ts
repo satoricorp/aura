@@ -17,7 +17,7 @@ afterEach(async () => {
 
 describe("main auth gate", () => {
   test("bare aura and help/version flags render without command analytics", async () => {
-    const authService = new FakeAuthService();
+    const authService = new FakeAuthService({ authenticated: false });
     const analytics = new FakeAnalyticsClient();
     let updateChecks = 0;
 
@@ -63,10 +63,7 @@ describe("main auth gate", () => {
     expect(bareOutput).toContain("AURA");
     expect(bareOutput).toContain("© Satori Engineering Inc. 2026 Version 1.2.3");
     expect(helpOutput).toContain("Usage: aura <command>");
-    expect(stripVTControlCharacters(helpOutput)).toContain(
-      "project not created. run `aura init`",
-    );
-    expect(stripVTControlCharacters(helpOutput)).toContain("signed in as teammate@example.com");
+    expect(stripVTControlCharacters(helpOutput)).toContain("not signed in");
     expect(stripVTControlCharacters(helpOutput)).toContain("aura login");
     expect(longHelpOutput).toContain("Usage: aura <command>");
     expect(shortHelpOutput).toContain("Usage: aura <command>");
@@ -74,31 +71,27 @@ describe("main auth gate", () => {
     expect(shortVersionOutput).toContain("1.2.3");
   });
 
-  test("normal commands require authentication first and emit command completed", async () => {
-    const cwd = await createTempProject(`# Aura Agents
-
-## Support Bot
-Handles support.
-`);
+  test("whoami when signed in uses getStatus and emits command completed", async () => {
     const authService = new FakeAuthService();
     const analytics = new FakeAnalyticsClient();
 
     await captureConsole(async () => {
-      await main(["list"], cwd, {
+      await main(["whoami"], process.cwd(), {
         analytics,
         authService,
         checkForUpdates: async () => null,
       });
     });
 
-    expect(authService.ensureCalls).toBe(1);
+    expect(authService.ensureCalls).toBe(0);
+    expect(authService.statusCalls).toBe(2);
     expect(analytics.captures).toEqual([
       {
         distinctId: "user_123",
         event: "command completed",
         properties: expect.objectContaining({
           authenticated: true,
-          command: "list",
+          command: "whoami",
           success: true,
         }),
       },
@@ -168,7 +161,7 @@ Handles support.
     ]);
   });
 
-  test("version and whoami authenticate before running and emit command completed", async () => {
+  test("version and whoami run update check when using full command path", async () => {
     const authService = new FakeAuthService();
     const analytics = new FakeAnalyticsClient();
     let updateChecks = 0;
@@ -191,8 +184,8 @@ Handles support.
       await main(["whoami"], process.cwd(), deps);
     });
 
-    expect(authService.ensureCalls).toBe(2);
-    expect(authService.statusCalls).toBe(1);
+    expect(authService.ensureCalls).toBe(0);
+    expect(authService.statusCalls).toBe(3);
     expect(updateChecks).toBe(2);
     expect(versionOutput).toContain("1.2.3");
     expect(whoamiOutput).toContain("Signed in as teammate@example.com");
@@ -214,35 +207,6 @@ Handles support.
           authenticated: true,
           command: "whoami",
           success: true,
-        }),
-      },
-    ]);
-  });
-
-  test("command failures emit command failed", async () => {
-    const cwd = await mkdtemp(path.join(tmpdir(), "aura-main-auth-"));
-    tempDirectories.push(cwd);
-    const authService = new FakeAuthService();
-    const analytics = new FakeAnalyticsClient();
-
-    await expect(
-      captureConsole(async () => {
-        await main(["list"], cwd, {
-          analytics,
-          authService,
-          checkForUpdates: async () => null,
-        });
-      }),
-    ).rejects.toThrow("aura.md not found");
-
-    expect(analytics.captures).toEqual([
-      {
-        distinctId: "user_123",
-        event: "command failed",
-        properties: expect.objectContaining({
-          authenticated: true,
-          command: "list",
-          success: false,
         }),
       },
     ]);
@@ -311,6 +275,12 @@ class FakeAuthService implements AuthService {
   logoutCalls = 0;
   statusCalls = 0;
 
+  private readonly authenticated: boolean;
+
+  constructor(options: { authenticated?: boolean } = {}) {
+    this.authenticated = options.authenticated ?? true;
+  }
+
   async ensureAuthenticated(): Promise<AuthState> {
     this.ensureCalls += 1;
     return createAuthState();
@@ -329,8 +299,8 @@ class FakeAuthService implements AuthService {
   async getStatus(): Promise<AuthStatus> {
     this.statusCalls += 1;
     return {
-      authenticated: true,
-      authState: createAuthState(),
+      authenticated: this.authenticated,
+      authState: this.authenticated ? createAuthState() : undefined,
       needsRefresh: false,
       path: "/tmp/aura/aura.json",
     };
@@ -344,13 +314,6 @@ class FakeAnalyticsClient implements PostHogClient {
   async capture(request: PostHogCaptureRequest): Promise<void> {
     this.captures.push(request);
   }
-}
-
-async function createTempProject(auraMarkdown: string): Promise<string> {
-  const cwd = await mkdtemp(path.join(tmpdir(), "aura-main-auth-"));
-  tempDirectories.push(cwd);
-  await writeFile(path.join(cwd, "aura.md"), auraMarkdown, "utf8");
-  return cwd;
 }
 
 async function captureConsole(run: () => Promise<void>): Promise<string> {

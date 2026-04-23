@@ -1,10 +1,2 @@
-export {
-  DEFAULT_CONFIG,
-  config,
-  createConfig,
-  loadConfig,
-  type AuraConfig,
-  type AuraConfigInput,
-  type AuraModelConfig,
-  type ModelProvider,
-} from "./core/config";
+// Public package surface for the `aura` npm package — add stable exports here as needed.
+export {};
