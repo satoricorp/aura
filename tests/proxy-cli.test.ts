@@ -105,6 +105,7 @@ describe("proxy CLI commands", () => {
 
 function createConfig(overrides: Partial<ProxyConfig> = {}): ProxyConfig {
   return {
+    clipboardDisabled: true,
     logDir: "/tmp/aura/sessions",
     port: 8787,
     upstreamOrigin: "http://127.0.0.1:1",

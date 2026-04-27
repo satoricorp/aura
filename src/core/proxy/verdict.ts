@@ -1,5 +1,12 @@
 import type { IncomingHttpHeaders } from "node:http";
-import { renderVerdict, renderVerdictUnavailable } from "./render";
+import { copyToClipboard, type ClipboardRunner } from "./clipboard";
+import {
+  renderAssistantVerdict,
+  renderAssistantVerdictUnavailable,
+  renderContinuationPrompt,
+  renderVerdictJsonLine,
+  renderVerdictUnavailableJsonLine,
+} from "./render";
 import type { SessionSummary, Verdict } from "./types";
 
 const SYSTEM_PROMPT = `You are Aura, a code review assistant that evaluates a coding agent's work
@@ -13,6 +20,13 @@ support? Flag risk: are the changes likely to break something?
 
 Be concise. The verdict will be displayed in a terminal in <30 lines.
 Do not pad. Do not hedge. If everything looks fine, say so plainly.
+
+Do not invent uncertainty. If the captured tool calls show an in-scope
+Write/Edit/MultiEdit to the requested file and the final message matches that
+tool call, mark it APPROVED unless there is a concrete risk. Do not require a
+separate diff or test run for a trivial text edit unless the original task asked
+for verification. Only flag discrepancies when the final message contradicts
+the captured tool calls or claims unobserved actions.
 
 Respond with JSON only, no preamble, matching this schema:
 {
@@ -68,30 +82,82 @@ export async function generateVerdict(options: GenerateVerdictOptions): Promise<
 export async function generateAndPrintVerdict(
   options: GenerateVerdictOptions & {
     appendVerdict: (verdict: Verdict | { error: string }) => Promise<void>;
+    clipboardDisabled: boolean;
+    clipboardRunner?: ClipboardRunner;
+    injected: boolean;
     stderr?: Pick<NodeJS.WriteStream, "write">;
+    stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
   },
 ): Promise<string> {
-  const stderr = options.stderr ?? process.stderr;
-
   try {
     const verdict = await generateVerdict(options);
     await options.appendVerdict(verdict);
-    const rendered = renderVerdict(verdict);
-    stderr.write(`${rendered}\n`);
-    return rendered;
+    await copyContinuationPrompt(verdict, options);
+    options.stdout?.write(
+      `${renderVerdictJsonLine({
+        color: options.stdout?.isTTY === true,
+        injected: options.injected,
+        model: options.model,
+        requestId: options.summary.requestId,
+        verdict,
+      })}\n`,
+    );
+    return renderAssistantVerdict(verdict);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await options.appendVerdict({ error: message });
-    const rendered = renderVerdictUnavailable(message, options.summary.sessionLogPath);
-    stderr.write(`${rendered}\n`);
-    return rendered;
+    options.stdout?.write(
+      `${renderVerdictUnavailableJsonLine({
+        color: options.stdout?.isTTY === true,
+        error: message,
+        injected: options.injected,
+        model: options.model,
+        requestId: options.summary.requestId,
+        sessionLogPath: options.summary.sessionLogPath,
+      })}\n`,
+    );
+    return renderAssistantVerdictUnavailable(message, options.summary.sessionLogPath);
   }
+}
+
+async function copyContinuationPrompt(
+  verdict: Verdict,
+  options: {
+    clipboardDisabled: boolean;
+    clipboardRunner?: ClipboardRunner;
+    stderr?: Pick<NodeJS.WriteStream, "write">;
+  },
+): Promise<void> {
+  if (options.clipboardDisabled) {
+    return;
+  }
+
+  const prompt = renderContinuationPrompt(verdict);
+  const result = await copyToClipboard(prompt, {
+    runner: options.clipboardRunner,
+  });
+
+  if (result.copied) {
+    options.stderr?.write("Aura copied next step to clipboard.\n");
+    return;
+  }
+
+  options.stderr?.write(
+    [
+      "Aura could not copy the next step to clipboard.",
+      result.error ? `Clipboard error: ${result.error}` : undefined,
+      prompt,
+      "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
 }
 
 export function buildVerdictUserMessage(summary: SessionSummary): string {
   const toolCalls = summary.toolCalls.length
     ? summary.toolCalls
-        .map((call, index) => `${index + 1}. ${call.tool_name}(${summarizeInput(call.summary)})`)
+        .map((call, index) => `${index + 1}. ${call.tool_name}(${summarizeToolInput(call.input)})`)
         .join("\n")
     : "(none)";
   const filesTouched = summary.filesTouched.length
@@ -200,8 +266,17 @@ function isVerdict(value: unknown): value is Verdict {
   );
 }
 
-function summarizeInput(summary: string): string {
-  return summary.replace(/^[^(]+ ?/, "");
+function summarizeToolInput(input: unknown): string {
+  if (input === undefined) {
+    return "";
+  }
+
+  const raw = typeof input === "string" ? input : JSON.stringify(input);
+  if (!raw) {
+    return "";
+  }
+
+  return raw.length > 600 ? `${raw.slice(0, 599)}…` : raw;
 }
 
 function firstHeader(value: string | string[] | undefined): string | undefined {

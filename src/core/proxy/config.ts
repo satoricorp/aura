@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 export interface ProxyConfig {
+  clipboardDisabled: boolean;
   logDir: string;
   port: number;
   upstreamOrigin: string;
@@ -15,6 +16,7 @@ const DEFAULT_UPSTREAM_ORIGIN = "https://api.anthropic.com";
 
 export function loadProxyConfig(env = process.env): ProxyConfig {
   return {
+    clipboardDisabled: env.AURA_DISABLE_CLIPBOARD === "1",
     logDir: env.AURA_LOG_DIR ?? path.join(homedir(), ".aura", "sessions"),
     port: parsePort(env.AURA_PORT, DEFAULT_PORT),
     upstreamOrigin: env.AURA_UPSTREAM_ORIGIN ?? DEFAULT_UPSTREAM_ORIGIN,

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import http from "node:http";
-import { generateVerdict, buildVerdictUserMessage } from "../src/core/proxy/verdict";
+import {
+  buildVerdictUserMessage,
+  generateAndPrintVerdict,
+  generateVerdict,
+} from "../src/core/proxy/verdict";
 import type { SessionSummary, Verdict } from "../src/core/proxy/types";
 
 const servers: http.Server[] = [];
@@ -15,6 +19,7 @@ describe("verdict generation", () => {
 
     expect(prompt).toContain("ORIGINAL TASK:\nfix parser");
     expect(prompt).toContain("1. Edit(");
+    expect(prompt).toContain('"file_path":"src/utils/parser.ts"');
     expect(prompt).toContain("AGENT'S FINAL MESSAGE:\nUpdated parser.ts");
     expect(prompt).toContain("modified src/utils/parser.ts");
   });
@@ -64,6 +69,67 @@ describe("verdict generation", () => {
     expect(result).toEqual(verdict);
   });
 
+  test("prints continuation prompt when clipboard copy fails", async () => {
+    let stderr = "";
+    const upstream = await createJsonServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          content: [{ type: "text", text: JSON.stringify(createVerdict("APPROVED", "Done")) }],
+        }),
+      );
+    });
+
+    await generateAndPrintVerdict({
+      appendVerdict: async () => {},
+      clipboardDisabled: false,
+      clipboardRunner: async () => {
+        throw new Error("no clipboard");
+      },
+      headers: { "x-api-key": "secret-key" },
+      injected: false,
+      model: "claude-haiku-test",
+      stderr: {
+        write: (chunk) => {
+          stderr += String(chunk);
+          return true;
+        },
+      },
+      summary: createSummary("fix parser"),
+      upstreamOrigin: upstream,
+    });
+
+    expect(stderr).toContain("Aura could not copy the next step to clipboard.");
+    expect(stderr).toContain("Continue from Aura's review:");
+  });
+
+  test("skips clipboard when disabled", async () => {
+    let clipboardCalls = 0;
+    const upstream = await createJsonServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          content: [{ type: "text", text: JSON.stringify(createVerdict("APPROVED", "Done")) }],
+        }),
+      );
+    });
+
+    await generateAndPrintVerdict({
+      appendVerdict: async () => {},
+      clipboardDisabled: true,
+      clipboardRunner: async () => {
+        clipboardCalls += 1;
+      },
+      headers: { "x-api-key": "secret-key" },
+      injected: false,
+      model: "claude-haiku-test",
+      summary: createSummary("fix parser"),
+      upstreamOrigin: upstream,
+    });
+
+    expect(clipboardCalls).toBe(0);
+  });
+
   test.each([
     ["fix the null check in src/utils/parser.ts line 42", "APPROVED"],
     ["refactor auth to use Better Auth", "REVIEW"],
@@ -105,11 +171,19 @@ function createSummary(originalTask: string): SessionSummary {
     inputTokens: 10,
     outputTokens: 20,
     originalTask,
+    proposedToolCalls: [
+      {
+        input: { file_path: "src/utils/parser.ts", new_string: "fixed parser" },
+        summary: "Edit src/utils/parser.ts",
+        tool_name: "Edit",
+      },
+    ],
+    reviewable: true,
     requestId: "req_test",
     sessionLogPath: "/tmp/session.jsonl",
     toolCalls: [
       {
-        input: { file_path: "src/utils/parser.ts" },
+        input: { file_path: "src/utils/parser.ts", new_string: "fixed parser" },
         summary: "Edit src/utils/parser.ts",
         tool_name: "Edit",
       },

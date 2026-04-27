@@ -94,6 +94,7 @@ export async function main(
     await startProxyServerFromDeps({
       config,
       stderr: process.stderr,
+      stdout: process.stdout,
     });
     return;
   }
@@ -111,6 +112,7 @@ export async function main(
     await startProxyServerFromDeps({
       config,
       stderr: process.stderr,
+      stdout: process.stdout,
     });
     return;
   }

@@ -13,7 +13,9 @@ export class SessionCapture {
   private finalAssistantText = "";
   private inputTokens = 0;
   private outputTokens = 0;
+  private readonly proposedToolCalls: CapturedToolCall[] = [];
   private sseBuffer = "";
+  private stopReason: string | undefined;
   private readonly toolCalls: CapturedToolCall[];
 
   constructor(
@@ -76,8 +78,11 @@ export class SessionCapture {
       inputTokens: this.inputTokens,
       outputTokens: this.outputTokens,
       originalTask: extractOriginalTask(this.requestBody),
+      proposedToolCalls: this.proposedToolCalls,
+      reviewable: isReviewableCodingRequest(this.requestBody),
       requestId: this.requestId,
       sessionLogPath: this.sessionLogPath,
+      stopReason: this.stopReason,
       toolCalls: this.toolCalls,
     };
   }
@@ -102,8 +107,14 @@ export class SessionCapture {
       return;
     }
 
-    if (event.type === "message_delta" && isRecord(event.usage)) {
-      this.outputTokens = numberValue(event.usage.output_tokens, this.outputTokens);
+    if (event.type === "message_delta") {
+      if (isRecord(event.delta) && typeof event.delta.stop_reason === "string") {
+        this.stopReason = event.delta.stop_reason;
+      }
+
+      if (isRecord(event.usage)) {
+        this.outputTokens = numberValue(event.usage.output_tokens, this.outputTokens);
+      }
       return;
     }
 
@@ -118,6 +129,10 @@ export class SessionCapture {
     }
 
     this.observeUsage(message.usage);
+    if (typeof message.stop_reason === "string") {
+      this.stopReason = message.stop_reason;
+    }
+
     const content = Array.isArray(message.content) ? message.content : [];
     const text: string[] = [];
 
@@ -131,11 +146,7 @@ export class SessionCapture {
       }
 
       if (block.type === "tool_use" && typeof block.name === "string") {
-        this.toolCalls.push({
-          tool_name: block.name,
-          input: block.input,
-          summary: summarizeToolCall(block.name, block.input),
-        });
+        this.addProposedToolCall(block.name, block.input);
       }
     }
 
@@ -194,11 +205,7 @@ export class SessionCapture {
 
     if (state.type === "tool_use" && state.name) {
       const input = parseJsonOrString(state.inputJson);
-      this.toolCalls.push({
-        tool_name: state.name,
-        input,
-        summary: summarizeToolCall(state.name, input),
-      });
+      this.addProposedToolCall(state.name, input);
     }
 
     this.blocks.delete(index);
@@ -211,6 +218,16 @@ export class SessionCapture {
 
     this.inputTokens = numberValue(usage.input_tokens, this.inputTokens);
     this.outputTokens = numberValue(usage.output_tokens, this.outputTokens);
+  }
+
+  private addProposedToolCall(toolName: string, input: unknown): void {
+    const call = {
+      tool_name: toolName,
+      input,
+      summary: summarizeToolCall(toolName, input),
+    };
+    this.proposedToolCalls.push(call);
+    this.toolCalls.push(call);
   }
 }
 
@@ -245,6 +262,32 @@ export function extractOriginalTask(requestBody: Record<string, unknown>): strin
   }
 
   return stringifyContent(firstUser.content);
+}
+
+function isReviewableCodingRequest(requestBody: Record<string, unknown>): boolean {
+  const task = extractOriginalTask(requestBody).trim().toLowerCase();
+  if (!task || task === "quota") {
+    return false;
+  }
+
+  const systemText = stringifySystem(requestBody.system).toLowerCase();
+  const metadataPromptMarkers = [
+    "generate a concise, sentence-case title",
+    'return json with a single "title" field',
+    "conversation summary",
+    "summarize the conversation",
+    "recap",
+  ];
+
+  return !metadataPromptMarkers.some((marker) => systemText.includes(marker));
+}
+
+function stringifySystem(system: unknown): string {
+  if (typeof system === "string") {
+    return system;
+  }
+
+  return stringifyContent(system);
 }
 
 function extractRequestToolCalls(requestBody: Record<string, unknown>): CapturedToolCall[] {

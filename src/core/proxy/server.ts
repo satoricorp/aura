@@ -1,14 +1,20 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import https from "node:https";
 import { randomUUID } from "node:crypto";
+import type { ClipboardRunner } from "./clipboard";
+import { copyToClipboard } from "./clipboard";
 import { SessionCapture, isMessageStopEvent } from "./capture";
 import type { ProxyConfig } from "./config";
+import { renderSteeringPrompt } from "./render";
 import { rotateOldSessionLogs, SessionLog } from "./session-log";
+import { evaluateToolSteering } from "./steering";
 import { generateAndPrintVerdict } from "./verdict";
 
 export interface StartProxyServerOptions {
+  clipboardRunner?: ClipboardRunner;
   config: ProxyConfig;
   stderr?: Pick<NodeJS.WriteStream, "write">;
+  stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 }
 
 export async function startProxyServer(options: StartProxyServerOptions): Promise<http.Server> {
@@ -113,7 +119,9 @@ async function handleProxyRequest(
             sawMessageStop,
             sessionLog,
             statusCode: upstreamResponse.statusCode ?? 0,
+            clipboardRunner: options.clipboardRunner,
             stderr: options.stderr,
+            stdout: options.stdout,
           });
 
           if (isStreaming && renderedVerdict) {
@@ -184,7 +192,9 @@ async function finalizeCapture(input: {
   sawMessageStop: boolean;
   sessionLog?: SessionLog;
   statusCode: number;
+  clipboardRunner?: ClipboardRunner;
   stderr?: Pick<NodeJS.WriteStream, "write">;
+  stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 }): Promise<string | null> {
   if (!input.capture || !input.sessionLog || input.statusCode < 200 || input.statusCode >= 300) {
     return null;
@@ -208,12 +218,27 @@ async function finalizeCapture(input: {
       request_id: summary.requestId,
     });
 
+    if (summary.stopReason === "tool_use") {
+      await surfaceToolSteering({
+        clipboardDisabled: input.config.clipboardDisabled,
+        clipboardRunner: input.clipboardRunner,
+        originalTask: summary.originalTask,
+        stderr: input.stderr,
+        toolCalls: summary.proposedToolCalls,
+      });
+      return null;
+    }
+
     if (!input.config.verdictDisabled && shouldGenerateVerdict(summary)) {
       return generateAndPrintVerdict({
         appendVerdict: (verdict) => input.sessionLog!.append("verdict", verdict),
+        clipboardDisabled: input.config.clipboardDisabled,
+        clipboardRunner: input.clipboardRunner,
         headers: input.headers,
+        injected: input.isStreaming,
         model: input.config.verdictModel,
         stderr: input.stderr,
+        stdout: input.stdout,
         summary,
         upstreamOrigin: input.config.upstreamOrigin,
       });
@@ -221,6 +246,50 @@ async function finalizeCapture(input: {
   }
 
   return null;
+}
+
+async function surfaceToolSteering(input: {
+  clipboardDisabled: boolean;
+  clipboardRunner?: ClipboardRunner;
+  originalTask: string;
+  stderr?: Pick<NodeJS.WriteStream, "write">;
+  toolCalls: ReturnType<SessionCapture["toSummary"]>["proposedToolCalls"];
+}): Promise<void> {
+  const decision = evaluateToolSteering({
+    originalTask: input.originalTask,
+    toolCalls: input.toolCalls,
+  });
+
+  if (decision.action === "allow") {
+    return;
+  }
+
+  if (decision.action === "warn") {
+    input.stderr?.write(`Aura steering warning: ${decision.message}\n`);
+    return;
+  }
+
+  const prompt = renderSteeringPrompt({
+    message: decision.prompt,
+    reason: decision.reason,
+    task: input.originalTask,
+  });
+
+  if (!input.clipboardDisabled) {
+    const result = await copyToClipboard(prompt, {
+      runner: input.clipboardRunner,
+    });
+    if (result.copied) {
+      input.stderr?.write("Aura copied steering prompt to clipboard.\n");
+      return;
+    }
+
+    input.stderr?.write(
+      `Aura could not copy steering prompt to clipboard${result.error ? `: ${result.error}` : ""}.\n`,
+    );
+  }
+
+  input.stderr?.write(`${prompt}\n`);
 }
 
 async function readBody(request: IncomingMessage): Promise<Buffer> {
@@ -252,13 +321,20 @@ function isEventStream(contentType: string | string[] | undefined): boolean {
 function shouldGenerateVerdict(summary: {
   finalAssistantText: string;
   originalTask: string;
+  reviewable: boolean;
+  stopReason?: string;
 }): boolean {
-  const task = summary.originalTask.trim().toLowerCase();
-  if (!summary.finalAssistantText.trim()) {
+  const finalText = summary.finalAssistantText.trim();
+  if (!summary.reviewable || !finalText || isClaudeMetadataResponse(finalText)) {
     return false;
   }
 
-  return task !== "quota";
+  return summary.stopReason !== "tool_use";
+}
+
+function isClaudeMetadataResponse(finalText: string): boolean {
+  const normalized = finalText.toLowerCase();
+  return normalized.startsWith("※ recap:") || normalized.includes("disable recaps in /config");
 }
 
 function shouldHoldFinalEvent(event: unknown): boolean {
@@ -278,7 +354,9 @@ function getEventIndex(event: unknown): number {
 }
 
 function serializeSseEvent(event: unknown): string {
-  return `data: ${JSON.stringify(event)}\n\n`;
+  const eventName =
+    isRecord(event) && typeof event.type === "string" ? `event: ${event.type}\n` : "";
+  return `${eventName}data: ${JSON.stringify(event)}\n\n`;
 }
 
 function createVerdictBlockStart(index: number): Record<string, unknown> {

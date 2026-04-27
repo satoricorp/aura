@@ -34,7 +34,10 @@ export interface SessionSummary {
   inputTokens: number;
   outputTokens: number;
   originalTask: string;
+  proposedToolCalls: CapturedToolCall[];
+  reviewable: boolean;
   requestId: string;
   sessionLogPath: string;
+  stopReason?: string;
   toolCalls: CapturedToolCall[];
 }

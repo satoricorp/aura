@@ -46,6 +46,7 @@ describe("SessionCapture", () => {
         inputTokens: 12,
         outputTokens: 7,
         originalTask: "fix parser",
+        stopReason: undefined,
         toolCalls: [
           {
             input: { file_path: "src/utils/parser.ts" },
@@ -92,6 +93,28 @@ describe("SessionCapture", () => {
     expect(capture.toSummary().finalAssistantText).toBe("Done");
   });
 
+  test("captures streaming stop reasons", () => {
+    const capture = new SessionCapture(
+      "req_test",
+      {
+        messages: [{ role: "user", content: "read readme" }],
+      },
+      "/tmp/session.jsonl",
+    );
+
+    capture.observeSseChunk(
+      Buffer.from(
+        `data: ${JSON.stringify({
+          type: "message_delta",
+          delta: { stop_reason: "tool_use" },
+          usage: { output_tokens: 4 },
+        })}\n\n`,
+      ),
+    );
+
+    expect(capture.toSummary().stopReason).toBe("tool_use");
+  });
+
   test("captures non-streaming responses", () => {
     const capture = new SessionCapture(
       "req_test",
@@ -118,6 +141,7 @@ describe("SessionCapture", () => {
         inputTokens: 3,
         originalTask: "read only",
         outputTokens: 4,
+        stopReason: "end_turn",
       }),
     );
   });
@@ -157,5 +181,23 @@ describe("SessionCapture", () => {
         path: "README.md",
       },
     ]);
+  });
+
+  test("marks Claude title generation requests as not reviewable", () => {
+    const capture = new SessionCapture(
+      "req_test",
+      {
+        messages: [{ role: "user", content: "add an extra line to the readme" }],
+        system: [
+          {
+            type: "text",
+            text: 'Generate a concise, sentence-case title. Return JSON with a single "title" field.',
+          },
+        ],
+      },
+      "/tmp/session.jsonl",
+    );
+
+    expect(capture.toSummary().reviewable).toBe(false);
   });
 });

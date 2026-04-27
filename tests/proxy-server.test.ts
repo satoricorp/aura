@@ -49,6 +49,7 @@ describe("startProxyServer", () => {
 
     const proxy = await startProxyServer({
       config: {
+        clipboardDisabled: true,
         logDir,
         port: 0,
         upstreamOrigin,
@@ -91,6 +92,9 @@ describe("startProxyServer", () => {
   test("appends the Aura verdict to streaming responses", async () => {
     const logDir = await mkdtemp(path.join(tmpdir(), "aura-proxy-"));
     tempDirectories.push(logDir);
+    let clipboardText = "";
+    let stderr = "";
+    let stdout = "";
 
     const upstreamOrigin = await createServer((request, response) => {
       void readRequestBody(request).then((body) => {
@@ -147,11 +151,27 @@ describe("startProxyServer", () => {
 
     const proxy = await startProxyServer({
       config: {
+        clipboardDisabled: false,
         logDir,
         port: 0,
         upstreamOrigin,
         verdictDisabled: false,
         verdictModel: "claude-test",
+      },
+      clipboardRunner: async (_command, _args, input) => {
+        clipboardText = input;
+      },
+      stderr: {
+        write: (chunk) => {
+          stderr += String(chunk);
+          return true;
+        },
+      },
+      stdout: {
+        write: (chunk) => {
+          stdout += String(chunk);
+          return true;
+        },
       },
     });
     servers.push(proxy);
@@ -185,12 +205,294 @@ describe("startProxyServer", () => {
     });
 
     expect(response.body).toContain("Created README.md");
-    expect(response.body).toContain("AURA");
-    expect(response.body.indexOf("AURA")).toBeLessThan(response.body.lastIndexOf("message_stop"));
+    expect(response.body).toContain("Aura: APPROVED - README created");
+    expect(response.body).toContain("event: content_block_start");
+    expect(response.body).toContain("event: content_block_delta");
+    expect(response.body).toContain("event: content_block_stop");
+    expect(response.body.indexOf("Aura:")).toBeLessThan(response.body.lastIndexOf("message_stop"));
+    expect(clipboardText).toContain("Continue from Aura's review:");
+    expect(clipboardText).toContain("Ready to commit");
+    expect(stderr).toContain("Aura copied next step to clipboard.");
+    expect(stdout.trim()).not.toContain("\n");
+    expect(JSON.parse(stdout)).toEqual({
+      type: "aura_verdict",
+      model: "claude-test",
+      request_id: expect.any(String),
+      injected: true,
+      status: "APPROVED",
+      summary: "README created",
+      task_understanding: "Create README",
+      changes: [{ path: "README.md", action: "created", note: "created README" }],
+      risks: [],
+      claimed_vs_actual: [],
+      next_step: "Ready to commit",
+    });
 
     const log = await waitForSessionLog(logDir);
     expect(log).toContain('"type":"verdict"');
     expect(log).toContain("README.md");
+  });
+
+  test("does not append verdicts to tool-use streaming responses", async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), "aura-proxy-"));
+    tempDirectories.push(logDir);
+    let verdictCalls = 0;
+
+    const upstreamOrigin = await createServer((request, response) => {
+      void readRequestBody(request).then((body) => {
+        const parsed = JSON.parse(body) as { stream?: boolean };
+        if (!parsed.stream) {
+          verdictCalls += 1;
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end("{}");
+          return;
+        }
+
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "text", text: "" },
+          })}\n\n`,
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text: "Let me read the README first." },
+          })}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify({ type: "content_block_stop", index: 0 })}\n\n`);
+        response.write(
+          `data: ${JSON.stringify({
+            type: "message_delta",
+            delta: { stop_reason: "tool_use" },
+            usage: { output_tokens: 8 },
+          })}\n\n`,
+        );
+        response.end(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      });
+    });
+
+    const proxy = await startProxyServer({
+      config: {
+        clipboardDisabled: true,
+        logDir,
+        port: 0,
+        upstreamOrigin,
+        verdictDisabled: false,
+        verdictModel: "claude-test",
+      },
+    });
+    servers.push(proxy);
+    const body = JSON.stringify({
+      max_tokens: 100,
+      messages: [{ role: "user", content: "add a line to README" }],
+      model: "claude-test",
+      stream: true,
+    });
+
+    const response = await request(serverOrigin(proxy), "/v1/messages", {
+      body,
+      headers: {
+        "content-length": String(Buffer.byteLength(body)),
+        "content-type": "application/json",
+        "x-api-key": "secret-key",
+      },
+      method: "POST",
+    });
+
+    expect(response.body).toContain("Let me read the README first.");
+    expect(response.body).not.toContain("AURA");
+    expect(verdictCalls).toBe(0);
+
+    const log = await waitForSessionLog(logDir);
+    expect(log).toContain('"type":"session_end"');
+    expect(log).not.toContain('"type":"verdict"');
+  });
+
+  test("copies correction prompts for dangerous tool-use responses without blocking them", async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), "aura-proxy-"));
+    tempDirectories.push(logDir);
+    let clipboardText = "";
+    let stderr = "";
+    let verdictCalls = 0;
+
+    const upstreamOrigin = await createServer((request, response) => {
+      void readRequestBody(request).then((body) => {
+        const parsed = JSON.parse(body) as { stream?: boolean };
+        if (!parsed.stream) {
+          verdictCalls += 1;
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end("{}");
+          return;
+        }
+
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "tool_use", name: "Bash", input: {} },
+          })}\n\n`,
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_delta",
+            index: 0,
+            delta: { partial_json: '{"command":"rm -rf /tmp/aura"}' },
+          })}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify({ type: "content_block_stop", index: 0 })}\n\n`);
+        response.write(
+          `data: ${JSON.stringify({
+            type: "message_delta",
+            delta: { stop_reason: "tool_use" },
+            usage: { output_tokens: 8 },
+          })}\n\n`,
+        );
+        response.end(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      });
+    });
+
+    const proxy = await startProxyServer({
+      config: {
+        clipboardDisabled: false,
+        logDir,
+        port: 0,
+        upstreamOrigin,
+        verdictDisabled: false,
+        verdictModel: "claude-test",
+      },
+      clipboardRunner: async (_command, _args, input) => {
+        clipboardText = input;
+      },
+      stderr: {
+        write: (chunk) => {
+          stderr += String(chunk);
+          return true;
+        },
+      },
+    });
+    servers.push(proxy);
+    const body = JSON.stringify({
+      max_tokens: 100,
+      messages: [{ role: "user", content: "clean temp files" }],
+      model: "claude-test",
+      stream: true,
+    });
+
+    const response = await request(serverOrigin(proxy), "/v1/messages", {
+      body,
+      headers: {
+        "content-length": String(Buffer.byteLength(body)),
+        "content-type": "application/json",
+        "x-api-key": "secret-key",
+      },
+      method: "POST",
+    });
+
+    expect(response.body).toContain("rm -rf /tmp/aura");
+    expect(response.body).not.toContain("Aura:");
+    expect(clipboardText).toContain("Continue with Aura's steering:");
+    expect(clipboardText).toContain("Pause before running `rm -rf /tmp/aura`.");
+    expect(stderr).toContain("Aura copied steering prompt to clipboard.");
+    expect(verdictCalls).toBe(0);
+  });
+
+  test("does not append verdicts to Claude recap responses", async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), "aura-proxy-"));
+    tempDirectories.push(logDir);
+    let verdictCalls = 0;
+
+    const upstreamOrigin = await createServer((request, response) => {
+      void readRequestBody(request).then((body) => {
+        const parsed = JSON.parse(body) as { stream?: boolean };
+        if (!parsed.stream) {
+          verdictCalls += 1;
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end("{}");
+          return;
+        }
+
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "text", text: "" },
+          })}\n\n`,
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "content_block_delta",
+            index: 0,
+            delta: {
+              type: "text_delta",
+              text: '※ recap: Added a new line "testing aura 2" to the README.',
+            },
+          })}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify({ type: "content_block_stop", index: 0 })}\n\n`);
+        response.write(
+          `data: ${JSON.stringify({
+            type: "message_delta",
+            delta: { stop_reason: "end_turn" },
+            usage: { output_tokens: 8 },
+          })}\n\n`,
+        );
+        response.end(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      });
+    });
+
+    const proxy = await startProxyServer({
+      config: {
+        clipboardDisabled: true,
+        logDir,
+        port: 0,
+        upstreamOrigin,
+        verdictDisabled: false,
+        verdictModel: "claude-test",
+      },
+    });
+    servers.push(proxy);
+    const body = JSON.stringify({
+      max_tokens: 100,
+      messages: [
+        { role: "user", content: "add a line to README" },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              name: "Edit",
+              input: { file_path: "README.md", new_string: "testing aura 2" },
+            },
+          ],
+        },
+      ],
+      model: "claude-test",
+      stream: true,
+    });
+
+    const response = await request(serverOrigin(proxy), "/v1/messages", {
+      body,
+      headers: {
+        "content-length": String(Buffer.byteLength(body)),
+        "content-type": "application/json",
+        "x-api-key": "secret-key",
+      },
+      method: "POST",
+    });
+
+    expect(response.body).toContain("※ recap:");
+    expect(response.body).not.toContain("Aura:");
+    expect(verdictCalls).toBe(0);
+
+    const log = await waitForSessionLog(logDir);
+    expect(log).toContain('"type":"session_end"');
+    expect(log).not.toContain('"type":"verdict"');
   });
 
   test("returns 404 outside /v1", async () => {
@@ -201,6 +503,7 @@ describe("startProxyServer", () => {
     });
     const proxy = await startProxyServer({
       config: {
+        clipboardDisabled: true,
         logDir,
         port: 0,
         upstreamOrigin,
