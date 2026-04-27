@@ -2,18 +2,23 @@
   "name": "aura",
   "version": "0.0.0",
   "bin": {
-    "aura": "./src/cli/index.ts"
+    "aura": "./dist/cli/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "scripts": {
+    "build": "bun build src/index.ts --target=node --outfile=dist/index.js && bun build src/cli/index.ts --target=node --outfile=dist/cli/index.js",
     "dev": "bun run src/cli/index.ts",
     "fmt": "oxfmt --config .oxfmtrc.json",
     "fmt:check": "oxfmt --config .oxfmtrc.json --check",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
+    "prepack": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
@@ -27,6 +32,9 @@
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "packageManager": "bun@1.2.18"
 }

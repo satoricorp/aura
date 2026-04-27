@@ -1,18 +1,35 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 import * as p from "@clack/prompts";
+import { pathToFileURL } from "node:url";
+import {
+  applyStartArgs,
+  formatInitResult,
+  formatStatus,
+  installAnthropicBaseUrl,
+} from "./commands/proxy";
 import { formatCurrentAuth } from "./commands/whoami";
 import { formatHomeScreen, formatUsage } from "./utils/format";
-import { buildCommandAnalyticsProperties } from "../core/analytics/cli";
+import { buildCommandAnalyticsProperties, type TrackedCommandName } from "../core/analytics/cli";
 import { createPostHogClient, type PostHogClient } from "../core/analytics/posthog";
 import { createAuthService, type CreateAuthServiceOptions } from "../core/auth/service";
 import type { AuthService } from "../core/auth/types";
 import { loadAuraEnv } from "../core/env";
 import { readAuraVersion } from "../core/package";
+import { loadProxyConfig } from "../core/proxy/config";
+import { startProxyServer } from "../core/proxy/server";
 import { checkForAuraUpdates } from "../core/version-check";
 
-type CommandName = "login" | "logout" | "whoami" | "version";
-const COMMAND_NAMES: CommandName[] = ["login", "logout", "whoami", "version"];
+type CommandName = "init" | "login" | "logout" | "start" | "status" | "whoami" | "version";
+const COMMAND_NAMES: CommandName[] = [
+  "init",
+  "login",
+  "logout",
+  "start",
+  "status",
+  "whoami",
+  "version",
+];
 
 export interface MainDeps {
   analytics?: PostHogClient;
@@ -22,7 +39,10 @@ export interface MainDeps {
   createAnalytics?: typeof createPostHogClient;
   createAuthService?: typeof createAuthService;
   loadEnv?: typeof loadAuraEnv;
+  loadProxyConfig?: typeof loadProxyConfig;
+  installAnthropicBaseUrl?: typeof installAnthropicBaseUrl;
   readVersion?: typeof readAuraVersion;
+  startProxyServer?: typeof startProxyServer;
 }
 
 type Invocation =
@@ -47,7 +67,10 @@ export async function main(
   const checkForUpdates = deps.checkForUpdates ?? checkForAuraUpdates;
   const createAnalytics = deps.createAnalytics ?? createPostHogClient;
   const createAuthServiceFromDeps = deps.createAuthService ?? createAuthService;
+  const installAnthropicBaseUrlFromDeps = deps.installAnthropicBaseUrl ?? installAnthropicBaseUrl;
+  const loadProxyConfigFromDeps = deps.loadProxyConfig ?? loadProxyConfig;
   const readVersion = deps.readVersion ?? readAuraVersion;
+  const startProxyServerFromDeps = deps.startProxyServer ?? startProxyServer;
 
   await loadEnv(cwd);
   const cliVersion = (await readVersion()) ?? "unknown";
@@ -61,6 +84,34 @@ export async function main(
 
   if (invocation.kind === "version-flag") {
     console.log(cliVersion);
+    return;
+  }
+
+  if (invocation.command === "init") {
+    const config = loadProxyConfigFromDeps();
+    const result = await installAnthropicBaseUrlFromDeps(process.env.SHELL, config.port);
+    console.log(formatInitResult(result));
+    await startProxyServerFromDeps({
+      config,
+      stderr: process.stderr,
+    });
+    return;
+  }
+
+  if (invocation.command === "status") {
+    const config = loadProxyConfigFromDeps();
+    console.log(await formatStatus(config.logDir));
+    return;
+  }
+
+  if (invocation.command === "start") {
+    const config = applyStartArgs(loadProxyConfigFromDeps(), invocation.args);
+    const result = await installAnthropicBaseUrlFromDeps(process.env.SHELL, config.port);
+    process.stderr.write(`${formatInitResult(result)}\n`);
+    await startProxyServerFromDeps({
+      config,
+      stderr: process.stderr,
+    });
     return;
   }
 
@@ -224,7 +275,7 @@ async function captureCommandOutcome(
     args: string[];
     authenticated: boolean;
     cliVersion: string;
-    command: CommandName;
+    command: TrackedCommandName;
     distinctId?: string;
     durationMs: number;
     success: boolean;
@@ -260,7 +311,7 @@ async function renderHomeScreen(cliVersion: string, authService: AuthService): P
   });
 }
 
-if (import.meta.main) {
+if (isMainModule()) {
   try {
     await main();
   } catch (error) {
@@ -268,4 +319,9 @@ if (import.meta.main) {
     p.log.error(message);
     process.exit(1);
   }
+}
+
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  return Boolean(entry && import.meta.url === pathToFileURL(entry).href);
 }

@@ -29,6 +29,18 @@ const ACCOUNT_COMMANDS: HelpCommand[] = [
 
 const UTILITY_COMMANDS: HelpCommand[] = [
   {
+    command: "aura init",
+    description: "print proxy shell setup",
+  },
+  {
+    command: "aura start",
+    description: "start the local Anthropic proxy",
+  },
+  {
+    command: "aura status",
+    description: "show recent verdicts",
+  },
+  {
     command: "aura version",
     description: "print the current version",
   },
@@ -62,9 +74,7 @@ export function formatHomeScreen(state: HomeScreenState): string {
 
 function formatCommandRows(commands: HelpCommand[]): string[] {
   const longest = Math.max(...commands.map((entry) => entry.command.length));
-  return commands.map(
-    (entry) => `  ${entry.command.padEnd(longest)}  ${entry.description}`,
-  );
+  return commands.map((entry) => `  ${entry.command.padEnd(longest)}  ${entry.description}`);
 }
 
 function formatStatusLine(label: string, value: string): string {

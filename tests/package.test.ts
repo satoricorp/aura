@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -49,5 +49,21 @@ describe("readAuraVersion", () => {
     );
 
     expect(await readAuraVersion(cwd)).toBe("1.2.3");
+  });
+});
+
+describe("package distribution", () => {
+  test("publishes the built Node CLI entry", async () => {
+    const raw = await readFile(path.join(process.cwd(), "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as {
+      bin?: Record<string, string>;
+      engines?: Record<string, string>;
+      scripts?: Record<string, string>;
+    };
+
+    expect(pkg.bin?.aura).toBe("./dist/cli/index.js");
+    expect(pkg.engines?.node).toBe(">=20");
+    expect(pkg.scripts?.build).toContain("dist/cli/index.js");
+    expect(pkg.scripts?.prepack).toBe("bun run build");
   });
 });
