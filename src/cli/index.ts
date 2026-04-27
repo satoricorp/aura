@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 
 import * as p from "@clack/prompts";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   applyStartArgs,
   formatInitResult,
+  formatSlashCommandInstallResult,
   formatStatus,
   installAnthropicBaseUrl,
+  installClaudeSlashCommands,
 } from "./commands/proxy";
+import { formatSessions, formatSlash } from "./commands/sessions";
 import { formatCurrentAuth } from "./commands/whoami";
 import { formatHomeScreen, formatUsage } from "./utils/format";
 import { buildCommandAnalyticsProperties, type TrackedCommandName } from "../core/analytics/cli";
@@ -20,11 +24,22 @@ import { loadProxyConfig } from "../core/proxy/config";
 import { startProxyServer } from "../core/proxy/server";
 import { checkForAuraUpdates } from "../core/version-check";
 
-type CommandName = "init" | "login" | "logout" | "start" | "status" | "whoami" | "version";
+type CommandName =
+  | "init"
+  | "login"
+  | "logout"
+  | "sessions"
+  | "slash"
+  | "start"
+  | "status"
+  | "whoami"
+  | "version";
 const COMMAND_NAMES: CommandName[] = [
   "init",
   "login",
   "logout",
+  "sessions",
+  "slash",
   "start",
   "status",
   "whoami",
@@ -40,6 +55,7 @@ export interface MainDeps {
   createAuthService?: typeof createAuthService;
   loadEnv?: typeof loadAuraEnv;
   loadProxyConfig?: typeof loadProxyConfig;
+  installClaudeSlashCommands?: typeof installClaudeSlashCommands;
   installAnthropicBaseUrl?: typeof installAnthropicBaseUrl;
   readVersion?: typeof readAuraVersion;
   startProxyServer?: typeof startProxyServer;
@@ -67,6 +83,8 @@ export async function main(
   const checkForUpdates = deps.checkForUpdates ?? checkForAuraUpdates;
   const createAnalytics = deps.createAnalytics ?? createPostHogClient;
   const createAuthServiceFromDeps = deps.createAuthService ?? createAuthService;
+  const installClaudeSlashCommandsFromDeps =
+    deps.installClaudeSlashCommands ?? installClaudeSlashCommands;
   const installAnthropicBaseUrlFromDeps = deps.installAnthropicBaseUrl ?? installAnthropicBaseUrl;
   const loadProxyConfigFromDeps = deps.loadProxyConfig ?? loadProxyConfig;
   const readVersion = deps.readVersion ?? readAuraVersion;
@@ -90,7 +108,10 @@ export async function main(
   if (invocation.command === "init") {
     const config = loadProxyConfigFromDeps();
     const result = await installAnthropicBaseUrlFromDeps(process.env.SHELL, config.port);
-    console.log(formatInitResult(result));
+    const slashCommands = await installClaudeSlashCommandsFromDeps();
+    console.log(
+      [formatInitResult(result), formatSlashCommandInstallResult(slashCommands)].join("\n\n"),
+    );
     await startProxyServerFromDeps({
       config,
       stderr: process.stderr,
@@ -105,10 +126,25 @@ export async function main(
     return;
   }
 
+  if (invocation.command === "sessions") {
+    const config = loadProxyConfigFromDeps();
+    console.log(await formatSessions(config.logDir));
+    return;
+  }
+
+  if (invocation.command === "slash") {
+    const config = loadProxyConfigFromDeps();
+    console.log(await formatSlash(invocation.args, config.logDir));
+    return;
+  }
+
   if (invocation.command === "start") {
     const config = applyStartArgs(loadProxyConfigFromDeps(), invocation.args);
     const result = await installAnthropicBaseUrlFromDeps(process.env.SHELL, config.port);
-    process.stderr.write(`${formatInitResult(result)}\n`);
+    const slashCommands = await installClaudeSlashCommandsFromDeps();
+    process.stderr.write(
+      `${[formatInitResult(result), formatSlashCommandInstallResult(slashCommands)].join("\n\n")}\n`,
+    );
     await startProxyServerFromDeps({
       config,
       stderr: process.stderr,
@@ -325,5 +361,13 @@ if (isMainModule()) {
 
 function isMainModule(): boolean {
   const entry = process.argv[1];
-  return Boolean(entry && import.meta.url === pathToFileURL(entry).href);
+  if (!entry) {
+    return false;
+  }
+
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
 }

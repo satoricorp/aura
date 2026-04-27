@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { parsePort, type ProxyConfig } from "../../core/proxy/config";
@@ -9,6 +9,33 @@ export interface InitResult {
   configPath: string;
   snippet: string;
 }
+
+export interface SlashCommandInstallResult {
+  changed: string[];
+  commandsDir: string;
+  unchanged: string[];
+}
+
+const CLAUDE_SLASH_COMMANDS = [
+  {
+    fileName: "aura-discrepancies.md",
+    label: "/aura-discrepancies",
+    content:
+      "Run `aura slash discrepancies` and use the output to explain any Aura discrepancies from the latest reviewed session.\n",
+  },
+  {
+    fileName: "aura-risks.md",
+    label: "/aura-risks",
+    content:
+      "Run `aura slash risks` and use the output to explain any Aura risks from the latest reviewed session.\n",
+  },
+  {
+    fileName: "aura-next.md",
+    label: "/aura-next",
+    content:
+      "Run `aura slash next` and continue from Aura's suggested next step for the latest reviewed session.\n",
+  },
+];
 
 export async function installAnthropicBaseUrl(
   shell = process.env.SHELL ?? "",
@@ -38,6 +65,34 @@ export async function installAnthropicBaseUrl(
   };
 }
 
+export async function installClaudeSlashCommands(
+  homeDirectory = homedir(),
+): Promise<SlashCommandInstallResult> {
+  const commandsDir = path.join(homeDirectory, ".claude", "commands");
+  const changed: string[] = [];
+  const unchanged: string[] = [];
+
+  await mkdir(commandsDir, { recursive: true });
+
+  for (const command of CLAUDE_SLASH_COMMANDS) {
+    const targetPath = path.join(commandsDir, command.fileName);
+    const existing = await readTextIfExists(targetPath);
+    if (existing === command.content) {
+      unchanged.push(command.label);
+      continue;
+    }
+
+    await writeFile(targetPath, command.content, "utf8");
+    changed.push(command.label);
+  }
+
+  return {
+    changed,
+    commandsDir,
+    unchanged,
+  };
+}
+
 export function formatInitResult(result: InitResult): string {
   const action = result.changed ? "Updated" : "Already configured";
   return [
@@ -47,6 +102,18 @@ export function formatInitResult(result: InitResult): string {
     `  ${result.snippet}`,
     "",
     "Open a new terminal and run your coding agent.",
+  ].join("\n");
+}
+
+export function formatSlashCommandInstallResult(result: SlashCommandInstallResult): string {
+  const commands = [...result.changed, ...result.unchanged].join(", ");
+  const action = result.changed.length > 0 ? "Updated" : "Already configured";
+
+  return [
+    "Claude Code slash commands",
+    "",
+    `${action}: ${result.commandsDir}`,
+    `  ${commands}`,
   ].join("\n");
 }
 

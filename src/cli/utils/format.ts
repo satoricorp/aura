@@ -37,6 +37,14 @@ const UTILITY_COMMANDS: HelpCommand[] = [
     description: "start the local Anthropic proxy",
   },
   {
+    command: "aura sessions",
+    description: "list captured sessions",
+  },
+  {
+    command: "aura slash",
+    description: "print Claude slash-command context",
+  },
+  {
     command: "aura status",
     description: "show recent verdicts",
   },
