@@ -150,6 +150,44 @@ describe("proxy CLI commands", () => {
     expect(output).toContain("Next step: Run the missing tests.");
   });
 
+  test("slash output skips Aura diagnostic sessions", async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), "aura-slash-"));
+    tempDirectories.push(logDir);
+    await writeSessionLog(logDir);
+    await writeDiagnosticSessionLog(logDir);
+
+    const output = await captureConsole(async () => {
+      await main(["slash", "risks"], process.cwd(), {
+        loadProxyConfig: () => createConfig({ logDir }),
+        readVersion: async () => "1.2.3",
+      });
+    });
+
+    expect(output).toContain("Session: req_test");
+    expect(output).toContain("- Missing verification.");
+    expect(output).not.toContain("req_aura");
+    expect(output).not.toContain("Diagnostic slash command");
+  });
+
+  test("slash output can target a specific session id", async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), "aura-slash-"));
+    tempDirectories.push(logDir);
+    await writeSessionLog(logDir);
+    await writeOtherSessionLog(logDir);
+
+    const output = await captureConsole(async () => {
+      await main(["slash", "risks", "req_test"], process.cwd(), {
+        loadProxyConfig: () => createConfig({ logDir }),
+        readVersion: async () => "1.2.3",
+      });
+    });
+
+    expect(output).toContain("Session: req_test");
+    expect(output).toContain("- Missing verification.");
+    expect(output).not.toContain("req_other");
+    expect(output).not.toContain("Other session risk.");
+  });
+
   test("start applies --port before starting the proxy", async () => {
     let observedInstallPort = 0;
     let observedPort = 0;
@@ -213,6 +251,73 @@ async function writeSessionLog(logDir: string): Promise<void> {
           risks: ["Missing verification."],
           claimed_vs_actual: ["Agent claimed tests passed, but no test command was observed."],
           next_step: "Run the missing tests.",
+        },
+      }),
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writeDiagnosticSessionLog(logDir: string): Promise<void> {
+  await writeFile(
+    path.join(logDir, "2026-04-26T00-01-00-000Z-req_aura.jsonl"),
+    [
+      JSON.stringify({
+        ts: "2026-04-26T00:01:00.000Z",
+        type: "request",
+        data: {
+          messages: [
+            {
+              role: "user",
+              content:
+                "Run `aura slash risks` and use the output to explain any Aura risks from the latest reviewed session.",
+            },
+          ],
+        },
+      }),
+      JSON.stringify({
+        ts: "2026-04-26T00:01:01.000Z",
+        type: "session_end",
+        data: { request_id: "req_aura", input_tokens: 10, output_tokens: 20 },
+      }),
+      JSON.stringify({
+        ts: "2026-04-26T00:01:02.000Z",
+        type: "verdict",
+        data: {
+          status: "APPROVED",
+          summary: "Diagnostic slash command",
+          task_understanding: "Show Aura risks",
+          changes: [],
+          risks: [],
+          claimed_vs_actual: [],
+          next_step: "No action needed.",
+        },
+      }),
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writeOtherSessionLog(logDir: string): Promise<void> {
+  await writeFile(
+    path.join(logDir, "2026-04-26T00-02-00-000Z-req_other.jsonl"),
+    [
+      JSON.stringify({
+        ts: "2026-04-26T00:02:00.000Z",
+        type: "session_end",
+        data: { request_id: "req_other", input_tokens: 10, output_tokens: 20 },
+      }),
+      JSON.stringify({
+        ts: "2026-04-26T00:02:01.000Z",
+        type: "verdict",
+        data: {
+          status: "REVIEW",
+          summary: "Other session",
+          task_understanding: "Do another task",
+          changes: [],
+          risks: ["Other session risk."],
+          claimed_vs_actual: [],
+          next_step: "Review the other session.",
         },
       }),
       "",

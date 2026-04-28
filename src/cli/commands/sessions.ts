@@ -3,6 +3,7 @@ import path from "node:path";
 import type { SessionLogEntry, Verdict } from "../../core/proxy/types";
 
 interface SessionRecord {
+  diagnostic: boolean;
   fileName: string;
   requestId: string;
   status: Verdict["status"] | "NO_VERDICT";
@@ -23,17 +24,22 @@ export async function formatSessions(logDir: string): Promise<string> {
 }
 
 export async function formatSlash(args: string[], logDir: string): Promise<string> {
-  const topic = parseSlashTopic(args);
-  const session = (await readSessions(logDir)).find((entry) => entry.verdict);
+  const { requestId, topic } = parseSlashArgs(args);
+  const sessions = await readSessions(logDir);
+  const session = requestId
+    ? sessions.find((entry) => entry.requestId === requestId)
+    : sessions.find((entry) => entry.verdict);
 
   if (!session?.verdict) {
-    return "No Aura verdict found. Run a Claude Code task through Aura first.";
+    return requestId
+      ? `No Aura verdict found for session ${requestId}.`
+      : "No Aura verdict found. Run a Claude Code task through Aura first.";
   }
 
   if (topic === "discrepancies") {
     return formatSlashList({
-      empty: "Aura found no discrepancies in the latest reviewed session.",
-      heading: "Review Aura's discrepancies for the latest session.",
+      empty: `Aura found no discrepancies in ${formatSessionScope(requestId)}.`,
+      heading: `Review Aura's discrepancies for ${formatSessionScope(requestId)}.`,
       items: session.verdict.claimed_vs_actual,
       session,
     });
@@ -41,15 +47,15 @@ export async function formatSlash(args: string[], logDir: string): Promise<strin
 
   if (topic === "risks") {
     return formatSlashList({
-      empty: "Aura found no risks in the latest reviewed session.",
-      heading: "Review Aura's risks for the latest session.",
+      empty: `Aura found no risks in ${formatSessionScope(requestId)}.`,
+      heading: `Review Aura's risks for ${formatSessionScope(requestId)}.`,
       items: session.verdict.risks,
       session,
     });
   }
 
   return [
-    "Continue from Aura's suggested next step for the latest session.",
+    `Continue from Aura's suggested next step for ${formatSessionScope(requestId)}.`,
     "",
     formatSessionContext(session),
     "",
@@ -73,7 +79,7 @@ async function readSessions(logDir: string): Promise<SessionRecord[]> {
       .map((entry) => readSession(path.join(logDir, entry), entry)),
   );
 
-  return sessions.filter((entry): entry is SessionRecord => entry !== null);
+  return sessions.filter((entry): entry is SessionRecord => entry !== null && !entry.diagnostic);
 }
 
 async function readSession(filePath: string, fileName: string): Promise<SessionRecord | null> {
@@ -81,11 +87,13 @@ async function readSession(filePath: string, fileName: string): Promise<SessionR
   const lines = raw.trim().split(/\r?\n/).filter(Boolean);
   const entries = lines.map(parseJson).filter(isSessionLogEntry);
   const verdict = findLastVerdict(entries);
+  const request = entries.find((entry) => entry.type === "request");
   const sessionEnd = [...entries].reverse().find((entry) => entry.type === "session_end");
   const ts = verdict?.entry.ts ?? sessionEnd?.ts ?? entries[0]?.ts ?? "";
   const requestId = extractRequestId(sessionEnd?.data) ?? extractRequestIdFromFileName(fileName);
 
   return {
+    diagnostic: isAuraDiagnosticRequest(request?.data),
     fileName,
     requestId,
     status: verdict?.verdict.status ?? "NO_VERDICT",
@@ -93,6 +101,20 @@ async function readSession(filePath: string, fileName: string): Promise<SessionR
     ts,
     verdict: verdict?.verdict,
   };
+}
+
+function isAuraDiagnosticRequest(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const task = extractOriginalTask(value).trim().toLowerCase();
+  return (
+    task.startsWith("/aura-") ||
+    task.includes("`aura slash discrepancies`") ||
+    task.includes("`aura slash risks`") ||
+    task.includes("`aura slash next`")
+  );
 }
 
 function findLastVerdict(
@@ -107,13 +129,13 @@ function findLastVerdict(
   return null;
 }
 
-function parseSlashTopic(args: string[]): SlashTopic {
-  const [topic, ...rest] = args;
+function parseSlashArgs(args: string[]): { requestId?: string; topic: SlashTopic } {
+  const [topic, requestId, ...rest] = args;
   if (rest.length > 0 || !isSlashTopic(topic)) {
-    throw new Error('Usage: aura slash <discrepancies|risks|next>');
+    throw new Error('Usage: aura slash <discrepancies|risks|next> [request-id]');
   }
 
-  return topic;
+  return { requestId, topic };
 }
 
 function isSlashTopic(value: string | undefined): value is SlashTopic {
@@ -122,6 +144,10 @@ function isSlashTopic(value: string | undefined): value is SlashTopic {
 
 function formatSessionRow(session: SessionRecord): string {
   return `${session.ts}  ${session.requestId.padEnd(12)}  ${session.status.padEnd(10)}  ${session.summary}`;
+}
+
+function formatSessionScope(requestId: string | undefined): string {
+  return requestId ? `session ${requestId}` : "the latest session";
 }
 
 function formatSlashList(input: {
@@ -158,6 +184,42 @@ function extractRequestId(value: unknown): string | undefined {
 function extractRequestIdFromFileName(fileName: string): string {
   const match = /-(req_[^.]+)\.jsonl$/.exec(fileName);
   return match?.[1] ?? fileName.replace(/\.jsonl$/, "");
+}
+
+function extractOriginalTask(requestBody: Record<string, unknown>): string {
+  const messages = Array.isArray(requestBody.messages) ? requestBody.messages : [];
+  const firstUser = messages.find((message) => isRecord(message) && message.role === "user");
+
+  if (!isRecord(firstUser)) {
+    return "";
+  }
+
+  return stringifyContent(firstUser.content);
+}
+
+function stringifyContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((block) => {
+      if (typeof block === "string") {
+        return block;
+      }
+
+      if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
+        return block.text;
+      }
+
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function parseJson(raw: string): unknown {

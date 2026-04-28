@@ -21,19 +21,19 @@ const CLAUDE_SLASH_COMMANDS = [
     fileName: "aura-discrepancies.md",
     label: "/aura-discrepancies",
     content:
-      "Run `aura slash discrepancies` and use the output to explain any Aura discrepancies from the latest reviewed session.\n",
+      "Find the latest Aura `Session: req_...` in this conversation. If the user provided `$ARGUMENTS`, use that as the session id instead. Run `aura slash discrepancies <session id>` when a session id is available; otherwise run `aura slash discrepancies`. Use the output to explain Aura discrepancies from that reviewed session.\n",
   },
   {
     fileName: "aura-risks.md",
     label: "/aura-risks",
     content:
-      "Run `aura slash risks` and use the output to explain any Aura risks from the latest reviewed session.\n",
+      "Find the latest Aura `Session: req_...` in this conversation. If the user provided `$ARGUMENTS`, use that as the session id instead. Run `aura slash risks <session id>` when a session id is available; otherwise run `aura slash risks`. Use the output to explain Aura risks from that reviewed session.\n",
   },
   {
     fileName: "aura-next.md",
     label: "/aura-next",
     content:
-      "Run `aura slash next` and continue from Aura's suggested next step for the latest reviewed session.\n",
+      "Find the latest Aura `Session: req_...` in this conversation. If the user provided `$ARGUMENTS`, use that as the session id instead. Run `aura slash next <session id>` when a session id is available; otherwise run `aura slash next`. Continue from Aura's suggested next step for that reviewed session.\n",
   },
 ];
 

@@ -102,7 +102,7 @@ export async function generateAndPrintVerdict(
         verdict,
       })}\n`,
     );
-    return renderAssistantVerdict(verdict);
+    return renderAssistantVerdict(verdict, options.summary.requestId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await options.appendVerdict({ error: message });

@@ -130,6 +130,29 @@ describe("verdict generation", () => {
     expect(clipboardCalls).toBe(0);
   });
 
+  test("returns assistant verdict with the request id", async () => {
+    const upstream = await createJsonServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          content: [{ type: "text", text: JSON.stringify(createVerdict("APPROVED", "Done")) }],
+        }),
+      );
+    });
+
+    const output = await generateAndPrintVerdict({
+      appendVerdict: async () => {},
+      clipboardDisabled: true,
+      headers: { "x-api-key": "secret-key" },
+      injected: false,
+      model: "claude-haiku-test",
+      summary: createSummary("fix parser"),
+      upstreamOrigin: upstream,
+    });
+
+    expect(output).toContain("Session: req_test");
+  });
+
   test.each([
     ["fix the null check in src/utils/parser.ts line 42", "APPROVED"],
     ["refactor auth to use Better Auth", "REVIEW"],

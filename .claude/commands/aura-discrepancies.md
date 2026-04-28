@@ -1,1 +1,1 @@
-Run `aura slash discrepancies` and use the output to explain any Aura discrepancies from the latest reviewed session.
+Find the latest Aura `Session: req_...` in this conversation. If the user provided `$ARGUMENTS`, use that as the session id instead. Run `aura slash discrepancies <session id>` when a session id is available; otherwise run `aura slash discrepancies`. Use the output to explain Aura discrepancies from that reviewed session.

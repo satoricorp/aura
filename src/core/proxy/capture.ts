@@ -266,7 +266,7 @@ export function extractOriginalTask(requestBody: Record<string, unknown>): strin
 
 function isReviewableCodingRequest(requestBody: Record<string, unknown>): boolean {
   const task = extractOriginalTask(requestBody).trim().toLowerCase();
-  if (!task || task === "quota") {
+  if (!task || task === "quota" || isAuraDiagnosticTask(task)) {
     return false;
   }
 
@@ -280,6 +280,15 @@ function isReviewableCodingRequest(requestBody: Record<string, unknown>): boolea
   ];
 
   return !metadataPromptMarkers.some((marker) => systemText.includes(marker));
+}
+
+function isAuraDiagnosticTask(task: string): boolean {
+  return (
+    task.startsWith("/aura-") ||
+    task.includes("`aura slash discrepancies`") ||
+    task.includes("`aura slash risks`") ||
+    task.includes("`aura slash next`")
+  );
 }
 
 function stringifySystem(system: unknown): string {

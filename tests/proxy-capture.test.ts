@@ -200,4 +200,22 @@ describe("SessionCapture", () => {
 
     expect(capture.toSummary().reviewable).toBe(false);
   });
+
+  test("marks Aura slash command turns as not reviewable", () => {
+    const capture = new SessionCapture(
+      "req_test",
+      {
+        messages: [
+          {
+            role: "user",
+            content:
+              "Run `aura slash risks` and use the output to explain any Aura risks from the latest reviewed session.",
+          },
+        ],
+      },
+      "/tmp/session.jsonl",
+    );
+
+    expect(capture.toSummary().reviewable).toBe(false);
+  });
 });

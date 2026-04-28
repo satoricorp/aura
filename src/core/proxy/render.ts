@@ -76,9 +76,10 @@ export function renderVerdictUnavailableJsonLine(input: {
   );
 }
 
-export function renderAssistantVerdict(verdict: Verdict): string {
+export function renderAssistantVerdict(verdict: Verdict, requestId?: string): string {
   return [
     `Aura: ${verdict.status} - ${verdict.summary}`,
+    ...(requestId ? [`Session: ${requestId}`] : []),
     `Task: ${verdict.task_understanding}`,
     ...assistantChanges(verdict),
     ...assistantSection("Risks", verdict.risks),

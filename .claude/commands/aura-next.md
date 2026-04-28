@@ -1,1 +1,1 @@
-Run `aura slash next` and continue from Aura's suggested next step for the latest reviewed session.
+Find the latest Aura `Session: req_...` in this conversation. If the user provided `$ARGUMENTS`, use that as the session id instead. Run `aura slash next <session id>` when a session id is available; otherwise run `aura slash next`. Continue from Aura's suggested next step for that reviewed session.

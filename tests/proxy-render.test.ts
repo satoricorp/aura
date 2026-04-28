@@ -43,23 +43,27 @@ describe("renderVerdict", () => {
   });
 
   test("renders readable assistant verdict without terminal truncation", () => {
-    const output = renderAssistantVerdict({
-      status: "APPROVED",
-      summary: "README line added",
-      task_understanding: "Add an extra line to README",
-      changes: [
-        {
-          action: "modified",
-          note: "added testing aura 1 at the end of the README",
-          path: "/Users/joe/git/aura/README.md",
-        },
-      ],
-      risks: [],
-      claimed_vs_actual: [],
-      next_step: "Ready to commit",
-    });
+    const output = renderAssistantVerdict(
+      {
+        status: "APPROVED",
+        summary: "README line added",
+        task_understanding: "Add an extra line to README",
+        changes: [
+          {
+            action: "modified",
+            note: "added testing aura 1 at the end of the README",
+            path: "/Users/joe/git/aura/README.md",
+          },
+        ],
+        risks: [],
+        claimed_vs_actual: [],
+        next_step: "Ready to commit",
+      },
+      "req_test",
+    );
 
     expect(output).toContain("Aura: APPROVED - README line added");
+    expect(output).toContain("Session: req_test");
     expect(output).toContain(
       "- modified /Users/joe/git/aura/README.md: added testing aura 1 at the end of the README",
     );
