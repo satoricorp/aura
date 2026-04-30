@@ -22,26 +22,26 @@ export ANTHROPIC_BASE_URL=http://localhost:8787
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `aura init` | Configure shell and start the proxy |
-| `aura start [--port N]` | Start the proxy server |
-| `aura status` | Show proxy status and recent requests |
-| `aura login` | Authenticate with Aura |
-| `aura logout` | Remove saved session |
-| `aura whoami` | Show current auth state |
-| `aura version` | Print CLI version |
+| Command                 | Description                           |
+| ----------------------- | ------------------------------------- |
+| `aura init`             | Configure shell and start the proxy   |
+| `aura start [--port N]` | Start the proxy server                |
+| `aura status`           | Show proxy status and recent requests |
+| `aura login`            | Authenticate with Aura                |
+| `aura logout`           | Remove saved session                  |
+| `aura whoami`           | Show current auth state               |
+| `aura version`          | Print CLI version                     |
 
 ## Environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AURA_PORT` | `8787` | Port the proxy listens on |
-| `AURA_LOG_DIR` | `~/.aura/sessions` | Directory for session logs |
-| `AURA_UPSTREAM_ORIGIN` | `https://api.anthropic.com` | Upstream API to proxy to |
-| `AURA_VERDICT_MODEL` | `claude-haiku-4-5-20251001` | Model used to generate verdicts |
-| `AURA_DISABLE_VERDICT` | — | Set to `1` to skip verdict generation |
-| `AURA_NO_UPDATES` | — | Set to `1` to suppress version-check warnings |
+| Variable               | Default                     | Description                                   |
+| ---------------------- | --------------------------- | --------------------------------------------- |
+| `AURA_PORT`            | `8787`                      | Port the proxy listens on                     |
+| `AURA_LOG_DIR`         | `~/.aura/sessions`          | Directory for session logs                    |
+| `AURA_UPSTREAM_ORIGIN` | `https://api.anthropic.com` | Upstream API to proxy to                      |
+| `AURA_VERDICT_MODEL`   | `claude-haiku-4-5-20251001` | Model used to generate verdicts               |
+| `AURA_DISABLE_VERDICT` | —                           | Set to `1` to skip verdict generation         |
+| `AURA_NO_UPDATES`      | —                           | Set to `1` to suppress version-check warnings |
 
 ## Development
 
@@ -53,13 +53,3 @@ bun run build      # compile to dist/
 ```
 
 Set `AURA_NO_UPDATES=1` to suppress version-check warnings.
-
-testing aura 1
-testing aura 2
-testing aura 3
-testing aura 4
-testing aura 5
-testing aura 6
-testing aura 7
-testing aura 8
-testing aura 9
