@@ -1,0 +1,933 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-11T23:48:36Z",
+  "tools": {
+    "claude": {
+      "sample_files": [
+        "/Users/joe/.claude/projects/-Users-joe-git-aura/c7ec4be3-a11e-4987-ac3d-295f66d86973.jsonl"
+      ],
+      "fields": [
+        {
+          "json_path": "type",
+          "occurrences": 52,
+          "inferred_type": "string",
+          "maps_to_session_events": "kind",
+          "notes": "record type discriminator"
+        },
+        {
+          "json_path": "sessionId",
+          "occurrences": 47,
+          "inferred_type": "string",
+          "maps_to_session_events": "session_id",
+          "notes": "Claude session identifier"
+        },
+        {
+          "json_path": "timestamp",
+          "occurrences": 42,
+          "inferred_type": "string",
+          "maps_to_session_events": "ts",
+          "notes": "ISO8601 event time"
+        },
+        {
+          "json_path": "cwd",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "entrypoint",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "gitBranch",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "isSidechain",
+          "occurrences": 41,
+          "inferred_type": "number",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "parentUuid",
+          "occurrences": 41,
+          "inferred_type": "null",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "userType",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "uuid",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "version",
+          "occurrences": 41,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "message.role",
+          "occurrences": 35,
+          "inferred_type": "string",
+          "maps_to_session_events": "",
+          "notes": "message role"
+        },
+        {
+          "json_path": "message",
+          "occurrences": 34,
+          "inferred_type": "object",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "message.content",
+          "occurrences": 34,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.model",
+          "occurrences": 18,
+          "inferred_type": "string",
+          "maps_to_session_events": "model",
+          "notes": "model id"
+        },
+        {
+          "json_path": "message.id",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.stop_details",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.stop_reason",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.stop_sequence",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.type",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "message.usage",
+          "occurrences": 17,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "promptId",
+          "occurrences": 17,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "requestId",
+          "occurrences": 17,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "sourceToolAssistantUUID",
+          "occurrences": 7,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "toolUseResult",
+          "occurrences": 7,
+          "inferred_type": "object",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "attachment",
+          "occurrences": 6,
+          "inferred_type": "object",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "attachment.type",
+          "occurrences": 6,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "isMeta",
+          "occurrences": 6,
+          "inferred_type": "number",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "isSnapshotUpdate",
+          "occurrences": 5,
+          "inferred_type": "number",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "messageId",
+          "occurrences": 5,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "snapshot",
+          "occurrences": 5,
+          "inferred_type": "object",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "snapshot.messageId",
+          "occurrences": 5,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "snapshot.timestamp",
+          "occurrences": 5,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "ts",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "snapshot.trackedFileBackups",
+          "occurrences": 5,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "attachment.allowedTools",
+          "occurrences": 4,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "permissionMode",
+          "occurrences": 4,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "toolUseResult.interrupted",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.isImage",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.noOutputExpected",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.stderr",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.stdout",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "attachment.content",
+          "occurrences": 2,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "lastPrompt",
+          "occurrences": 2,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "sourceToolUseID",
+          "occurrences": 2,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "toolUseResult.commandName",
+          "occurrences": 2,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.success",
+          "occurrences": 2,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "attachment.isInitial",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "attachment.itemCount",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "attachment.skillCount",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "content",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "message.content[].tool_use.input.content",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "new_text",
+          "notes": "Write tool payload"
+        },
+        {
+          "json_path": "message.content[].tool_use.input.file_path",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "file_path",
+          "notes": "target file"
+        },
+        {
+          "json_path": "message.content[].tool_use.input.new_string",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "new_text",
+          "notes": "Edit new text"
+        },
+        {
+          "json_path": "message.content[].tool_use.input.old_string",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "old_text",
+          "notes": "Edit old text"
+        },
+        {
+          "json_path": "message.content[].tool_use.name",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "kind",
+          "notes": "edit tool identifier"
+        },
+        {
+          "json_path": "message.content[].type",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "kind",
+          "notes": "content block type"
+        },
+        {
+          "json_path": "subtype",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "toolUseResult.file",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.filePath",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.newString",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.oldString",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.originalFile",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.replaceAll",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.structuredPatch",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.type",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "toolUseResult.userModified",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        }
+      ]
+    },
+    "codex": {
+      "sample_files": [
+        "/Users/joe/.codex/sessions/2026/05/02/rollout-2026-05-02T19-05-21-019deb27-698e-7141-bd5a-a0374eb7cba4.jsonl"
+      ],
+      "fields": [
+        {
+          "json_path": "timestamp",
+          "occurrences": 138,
+          "inferred_type": "string",
+          "maps_to_session_events": "ts",
+          "notes": "ISO8601 event time"
+        },
+        {
+          "json_path": "type",
+          "occurrences": 138,
+          "inferred_type": "string",
+          "maps_to_session_events": "kind",
+          "notes": "rollout record type"
+        },
+        {
+          "json_path": "payload",
+          "occurrences": 137,
+          "inferred_type": "object",
+          "maps_to_session_events": ""
+        },
+        {
+          "json_path": "payload.type",
+          "occurrences": 133,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.call_id",
+          "occurrences": 68,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.turn_id",
+          "occurrences": 32,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.content",
+          "occurrences": 30,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "new_text",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.cwd",
+          "occurrences": 26,
+          "inferred_type": "string",
+          "maps_to_session_events": "",
+          "notes": "working directory"
+        },
+        {
+          "json_path": "payload.phase",
+          "occurrences": 25,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.name",
+          "occurrences": 24,
+          "inferred_type": "string",
+          "maps_to_session_events": "kind",
+          "notes": "tool name"
+        },
+        {
+          "json_path": "payload.arguments",
+          "occurrences": 23,
+          "inferred_type": "string",
+          "maps_to_session_events": "new_text",
+          "notes": "patch or write payload"
+        },
+        {
+          "json_path": "payload.output",
+          "occurrences": 23,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.status",
+          "occurrences": 23,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.source",
+          "occurrences": 22,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.stderr",
+          "occurrences": 22,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.stdout",
+          "occurrences": 22,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.aggregated_output",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.command",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.duration",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.exit_code",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.formatted_output",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.parsed_cmd",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.process_id",
+          "occurrences": 21,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.role",
+          "occurrences": 19,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.message",
+          "occurrences": 15,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.summary",
+          "occurrences": 14,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.info",
+          "occurrences": 13,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.rate_limits",
+          "occurrences": 13,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.memory_citation",
+          "occurrences": 12,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.encrypted_content",
+          "occurrences": 11,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "new_text",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.model",
+          "occurrences": 4,
+          "inferred_type": "string",
+          "maps_to_session_events": "model",
+          "notes": "model id"
+        },
+        {
+          "json_path": "payload.approval_policy",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.collaboration_mode",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.collaboration_mode_kind",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.completed_at",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.current_date",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.duration_ms",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.effort",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.images",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.last_agent_message",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.local_images",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.model_context_window",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "model",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.permission_profile",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.personality",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.realtime_active",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.sandbox_policy",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.started_at",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.text_elements",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.time_to_first_token_ms",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.timezone",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.truncation_policy",
+          "occurrences": 3,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.base_instructions",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.changes",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.cli_version",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.git",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.id",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.input",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.item",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.model_provider",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "model",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.originator",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.session_id",
+          "occurrences": 1,
+          "inferred_type": "string",
+          "maps_to_session_events": "session_id",
+          "notes": "Codex session id"
+        },
+        {
+          "json_path": "payload.success",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.thread_id",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "",
+          "notes": "shallow"
+        },
+        {
+          "json_path": "payload.timestamp",
+          "occurrences": 1,
+          "inferred_type": "unknown",
+          "maps_to_session_events": "ts",
+          "notes": "shallow"
+        }
+      ]
+    }
+  },
+  "proposed_session_events_columns": [
+    "session_id",
+    "tool",
+    "model",
+    "ts",
+    "kind",
+    "file_path",
+    "old_text",
+    "new_text",
+    "prompt_context",
+    "raw_json"
+  ],
+  "overflow_fields": [
+    "usage",
+    "requestId",
+    "parentUuid",
+    "uuid",
+    "promptId",
+    "permissionMode",
+    "gitBranch",
+    "version",
+    "entrypoint",
+    "structuredPatch",
+    "toolUseResult",
+    "attachment",
+    "payload.git"
+  ]
+}
